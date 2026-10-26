@@ -30,7 +30,6 @@
     if(root==='workbench'&&cid){history.replaceState(null,'','#competition/'+encodeURIComponent(cid));setTimeout(()=>open(cid),0);}
     else if(['workbench','submissions'].includes(root))history.replaceState(null,'','#mine');
     previous();
-    if(location.hash==='#mine')document.querySelectorAll('.participation-card').forEach(el=>{const a=el.querySelector('a[href^="#competition/"]');const id=a?.hash.split('/')[1];if(id&&ctx(id).team)el.insertAdjacentHTML('beforeend',' '+entry(id));});
   };
   document.addEventListener('keydown',e=>{
     if(!drawer)return;

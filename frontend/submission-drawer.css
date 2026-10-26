@@ -21,3 +21,5 @@ body.submission-embedded{background:#fff}
 @media(max-width:600px){.submission-embedded #app{padding:0 16px 20px}.submission-embedded .embedded-tabs{margin:0 -16px 16px;padding:0 16px}.submission-embedded .form-card{padding:16px}.submission-embedded .choices{flex-wrap:wrap}}
 
 .submission-embedded .page-heading{margin:12px 0;display:flex;justify-content:flex-end}.submission-embedded .page-heading>div{display:none}
+
+.terms-confirm{margin-top:18px}.demo-terms{margin:16px 0;font-size:11px;color:#7c8173}.demo-terms summary{cursor:pointer;text-decoration:underline}.demo-terms p{line-height:1.8}.submission-embedded .choices label{min-width:0}.submission-embedded .btn:disabled{cursor:not-allowed}.submission-embedded .field>label{line-height:1.7}
