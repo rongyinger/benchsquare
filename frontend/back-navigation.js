@@ -11,6 +11,7 @@
     container.prepend(bar);
   }
   if(isSubmission){
+    if(new URLSearchParams(location.search).get('embed')==='1')return;
     function decorate(){
       const app=document.querySelector('#app'),route=location.hash||'#new',params=new URLSearchParams(location.search),cid=params.get('competition');
       const list=route==='#list',href=list?(cid?'index.html#workbench/'+encodeURIComponent(cid):'index.html#mine'):'#list';

@@ -2,17 +2,19 @@
   'use strict';
   const M=SubmissionModel, E=M.escape, $=s=>document.querySelector(s), clone=o=>JSON.parse(JSON.stringify(o));
   const W=WorkbenchModel, params=new URLSearchParams(location.search),cid=params.get('competition'),tid=params.get('team'),scoped=!!(cid||tid);
+  const embedded=params.get('embed')==='1'&&window.parent!==window;
+  if(embedded)document.body.classList.add('submission-embedded');
   const teamWorkspaceKey=scoped?cid+':'+tid:null;
   const context=()=>W.context(W.read(),cid,tid,DEMO_COMPETITIONS);
   const actor=scoped?context().user:null;
   const workspaceKey=scoped?teamWorkspaceKey+':'+actor:null;
-  const issue=(submit=false,targetId)=>{if(!scoped)return '';if(!cid||!tid)return '比赛或团队信息不完整，请从参赛工作台重新进入。';const x=context();if(x.user!==actor)return '演示身份已变化，请返回参赛工作台重新进入。';return W.permission(x,W.read().participation?.workbenchClock?.[cid],submit,store.records.find(r=>r.id===(targetId||(location.hash.startsWith('#detail/')?location.hash.split('/')[1]:editingId))));};
+  const issue=(submit=false,targetId)=>{if(!scoped)return '';if(!cid||!tid)return '比赛或团队信息不完整，请从比赛详情重新进入。';const x=context();if(x.user!==actor)return '演示身份已变化，请返回比赛详情重新进入。';return W.permission(x,W.read().participation?.workbenchClock?.[cid],submit,store.records.find(r=>r.id===(targetId||(location.hash.startsWith('#detail/')?location.hash.split('/')[1]:editingId))));};
   const visible=r=>scoped?W.belongs(r,cid,tid)&&W.ownerOf(r,context().team)===actor:!r.competitionId;
   const S=r=>W.taskStatus(r.status);
   const editable=r=>['草稿','待初审','需修改'].includes(S(r));
   const recordLabel=scoped?'任务与提交':'我的提交';
-  const back=scoped?'index.html#workbench/'+encodeURIComponent(cid):'index.html#mine';
-  function contextPanel(){if(!scoped)return '';const x=context(),c=x.competition,v=c?.values||{};return '<div class="submission-context"><a href="'+back+'">← 返回比赛工作台</a><span>'+E(c?.title||v.name||'比赛不可用')+' / '+E(x.team?.name||'团队不可用')+'</span></div>';}
+  const back=scoped?'index.html#competition/'+encodeURIComponent(cid):'index.html#mine';
+  function contextPanel(){if(!scoped)return '';const x=context(),c=x.competition,v=c?.values||{};return '<div class="submission-context"><a href="'+back+'">← 返回比赛详情</a><span>'+E(c?.title||v.name||'比赛不可用')+' / '+E(x.team?.name||'团队不可用')+'</span></div>';}
   const files=new Map(); // File objects live only in this page session, never in storage.
   let store={version:1,records:[],work:null}, storageWarning='';
   try{const raw=localStorage.getItem(M.config.storageKey);if(raw){const s=JSON.parse(raw);if(s.version!==1||!Array.isArray(s.records)||s.records.some(r=>!r.form||!Array.isArray(r.form.attachments))||(s.work&&(!s.work.form||!Array.isArray(s.work.form.attachments))))throw Error('格式错误');store=s;}}catch{storageWarning='本地记录无法读取；当前使用空白工作区。保存会覆盖此 Demo 的损坏记录。';}
@@ -51,7 +53,7 @@
   }
   function scheduleStep(){if(stepFrame)return;stepFrame=requestAnimationFrame(()=>{stepFrame=0;updateActiveStep();});}
   window.addEventListener('scroll',scheduleStep,{passive:true});window.addEventListener('resize',scheduleStep);
-  function render(){if(scoped){const nav=document.querySelector('.header nav');nav.querySelector('a').href=back;nav.querySelector('a').textContent='返回比赛工作台';nav.querySelector('[data-nav="list"]').textContent=recordLabel;}busy=false;route=location.hash||'#new';tab='edit';document.querySelectorAll('[data-nav]').forEach(a=>{const active=a.dataset.nav===(route.startsWith('#new')?'new':'list');a.classList.toggle('active',active);active?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');});$('#app').innerHTML=contextPanel()+(scoped&&(!context().team||!context().registered||context().user!==actor)?'<div class="empty-state"><h2>无权访问该团队工作区</h2><a href="index.html#mine">返回我的比赛</a></div>':route==='#list'?list():route.startsWith('#detail/')?detail(route.slice(8)):editor());if($('#record-rows'))rows();if($('#task-form')){updateProgress();showErrors();scheduleStep();}document.title=(route==='#list'?recordLabel:route.startsWith('#detail/')?'任务详情':'提交任务')+' · Benchsquare';}
+  function render(){if(scoped){const nav=document.querySelector('.header nav');nav.querySelector('a').href=back;nav.querySelector('a').textContent='返回比赛详情';nav.querySelector('[data-nav="list"]').textContent=recordLabel;}busy=false;route=location.hash||'#new';tab='edit';document.querySelectorAll('[data-nav]').forEach(a=>{const active=a.dataset.nav===(route.startsWith('#new')?'new':'list');a.classList.toggle('active',active);active?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');});$('#app').innerHTML=(embedded?'<nav class="embedded-tabs" aria-label="数据提交"><a href="#new" class="'+(route==='#new'?'active':'')+'">提交数据</a><a href="#list" class="'+(route!=='#new'?'active':'')+'">我的提交与草稿</a></nav>':'')+contextPanel()+(scoped&&(!context().team||!context().registered||context().user!==actor)?'<div class="empty-state"><h2>无权访问该团队工作区</h2><a href="index.html#mine">返回我的比赛</a></div>':route==='#list'?list():route.startsWith('#detail/')?detail(route.slice(8)):editor());if($('#record-rows'))rows();if($('#task-form')){updateProgress();showErrors();scheduleStep();}document.title=(route==='#list'?recordLabel:route.startsWith('#detail/')?'任务详情':'提交任务')+' · Benchsquare';}
   function showErrors(){for(const k of ['name','domain','software','os','license','duration','description','verification','consent','attachments']){const el=$('#err-'+k);if(el)el.textContent=errors[k]||'';const control=$('#f-'+k);if(control)control.setAttribute('aria-invalid',errors[k]?'true':'false');}}
   function guard(){return !($('#task-form')&&dirty())||confirm('还有未保存的修改。离开将不保存为草稿，但文本会保留在本地恢复缓存中。确认离开？');}
   function go(hash){skipGuard=true;location.hash=hash;if(location.hash===route){skipGuard=false;render();}window.scrollTo(0,0);}
@@ -84,6 +86,10 @@
   document.addEventListener('dragover',e=>{const z=e.target.closest('.dropzone');if(z){e.preventDefault();z.classList.add('dragging');}});document.addEventListener('dragleave',e=>e.target.closest('.dropzone')?.classList.remove('dragging'));
   document.addEventListener('drop',e=>{e.preventDefault();const z=e.target.closest('.dropzone');if(z)addFiles(z.dataset.category,Array.from(e.dataTransfer.files));});document.addEventListener('dragover',e=>e.preventDefault());
   $('#close-preview').addEventListener('click',()=>$('#preview').close());
+  if(embedded){
+    window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==parent||e.data?.type!=='submission-close-request')return;if(guard())parent.postMessage({type:'submission-close-approved'},location.origin);});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#preview').open){e.preventDefault();if(guard())parent.postMessage({type:'submission-close-approved'},location.origin);}});
+  }
   window.addEventListener('beforeunload',e=>{if($('#task-form')&&dirty()){e.preventDefault();e.returnValue='';}});
   window.addEventListener('hashchange',()=>{if(!skipGuard&&!guard()){skipGuard=true;location.hash=route;return;}skipGuard=false;render();window.scrollTo(0,0);});window.addEventListener('storage',e=>{if(e.key===W.stateKey){render();notice('比赛或身份信息已变化，操作权限已刷新。');}else if(e.key===M.config.storageKey){if($('#task-form')&&dirty()){busy=true;notice('另一个页面更新了任务，请保留当前内容并刷新后继续。');document.querySelectorAll('[data-do="save"],[data-do="submit"]').forEach(b=>b.disabled=true);}else {try{const latest=JSON.parse(e.newValue);if(latest?.records){store.records=latest.records;render();}}catch{}}}});render();
 })();
