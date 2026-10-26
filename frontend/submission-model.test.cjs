@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),M=require('./submission-model.js');
+const f=M.empty(),files=new Map();
+assert.equal(Object.keys(M.validate(f,files)).length,8);
+const sample=M.sample();sample.consent=true;assert.deepEqual(M.validate(sample,files),{});
+assert.deepEqual(sample.os,['Linux']);assert.equal(sample.duration,'');assert.ok(sample.software.includes('2.2.6'));
+assert.equal(sample.attachments.length,3);assert.ok(sample.attachments.every(a=>a.source==='placeholder'));
+const a={id:'a',category:'reference',name:'test.txt',size:5,source:'file'};sample.attachments.push(a);
+assert.ok(M.validate(sample,files).attachments);files.set('a',{name:'test.txt'});assert.deepEqual(M.validate(sample,files),{});
+sample.duration='-2';assert.ok(M.validate(sample,files).duration);sample.duration='Infinity';assert.ok(M.validate(sample,files).duration);
+const attack='<img src=x onerror=alert(1)>\n<script>alert(2)</script>\n[x](javascript:alert(3))';const html=M.markdown(attack);
+assert.ok(!html.includes('<img'));assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<a'));assert.ok(html.includes('&lt;script&gt;'));
+assert.ok(M.markdown('# 标题\n- **100 分**\n`code`').includes('<strong>100 分</strong>'));
+assert.ok(!JSON.stringify(sample).includes('base64'));console.log('Submission model: validation, stale files, sample boundaries and safe Markdown passed.');

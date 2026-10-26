@@ -1,0 +1,62 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(__dirname+'/app.js','utf8');
+const context={state:{competitions:[]},initial:[],detailTab:'概览',esc:value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'),teamContent:()=>'<p>团队交互</p>'};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync(__dirname+'/competition-fields.js','utf8'),context);
+vm.runInContext(source.slice(source.indexOf('const participationRuleDefaults='),source.indexOf('function fieldHtml(')),context);
+vm.runInContext(source.slice(source.indexOf('function detailContent('),source.indexOf('function teamContent(')),context);
+vm.runInContext(source.slice(source.indexOf('const all=()=>'),source.indexOf('\nconst find='))+';globalThis.list=all;',context);
+vm.runInContext('globalThis.formModules=modules;globalThis.rules=platformCompetitionRules;',context);
+const values={};for(const module of context.formModules)for(const [key]of module.fields)values[key]='字段内容_'+key;
+Object.assign(values,{pool:30000,rankBudget:27000,customBudget:3000,registrationStart:'2026-11-01T09:00',registrationEnd:'2026-11-15T18:00',submissionStart:'2026-11-16T09:00',submissionEnd:'2026-12-06T18:00',teamMode:'团队',teamMax:8,distribution:'旧发放规则'});
+const competition={id:'published',values};let combined='';
+for(const [tab,indexes]of [['概览',[0,1]],['参赛规则',[2,4]],['赛程与奖励',[3,5]]]){
+  context.detailTab=tab;const html=context.detailContent(competition);combined+=html;
+  for(const index of indexes)for(const [key,label]of context.formModules[index].fields){assert.ok(html.includes(`data-competition-field="${key}"`),tab+'缺少'+key);assert.ok(html.includes(label));}
+}
+for(const module of context.formModules)for(const [key]of module.fields)assert.equal(combined.split(`data-competition-field="${key}"`).length-1,1,key+'必须仅对应一个展示位置');
+assert.ok(combined.includes('字段内容_environment')&&combined.includes('字段内容_fields')&&combined.includes('字段内容_scale'));
+assert.ok(combined.includes(context.rules.distribution));assert.ok(!combined.includes('旧发放规则'));assert.ok(!combined.includes('仅个人参赛'));
+assert.ok(combined.includes('2026-11-15 18:00'));assert.ok(combined.includes('每队最多8人'));
+context.detailTab='概览';const empty=context.detailContent({values:{description:'<script>不应执行</script>'}});assert.ok(empty.includes('&lt;script&gt;'));assert.ok(empty.includes('未填写'));assert.ok(!empty.includes('我们邀请具有相关领域经验'));
+const legacy=context.competitionValues({config:{name:'CAD示例',theme:'多视图理解',summary:'原始简介',dataLicense:'原始许可',compDomain:'工程与制造',scope:'边界内容',benchmarkCriteria:'验收标准',fieldSpec:'栏目要求',fileFormats:'STEP / ZIP',prizePool:'200,000',rankingBudget:150000,rankingRule:'前10名',customAwards:[{name:'专业奖',budget:50000,rule:'覆盖3个领域'}],schedule:{regStart:'2026-11-09 10:00',regEnd:'2026-11-30 23:59'}}});
+assert.equal(legacy.topic,'多视图理解');assert.equal(legacy.description,'原始简介');assert.equal(legacy.license,'原始许可');assert.equal(legacy.fields,'栏目要求');assert.equal(legacy.registrationEnd,'2026-11-30 23:59');assert.equal(legacy.customBudget,50000);
+assert.equal(context.competitionFieldValue('customBudget',0,'number'),'0 元');
+context.state.competitions=[{id:'published',stage:'已发布',values:{...values,tags:'科学推理、实验分析'}}];const projected=context.list()[0];assert.equal(projected.values.environment,values.environment);assert.deepEqual(Array.from(projected.tags),['科学推理','实验分析']);assert.equal(projected.values.teamMax,8);
+context.detailTab='团队';assert.equal(context.detailContent(competition),'<p>团队交互</p>');
+const demoContext={state:{draft:{}},esc:context.esc,document:{addEventListener(){}}};vm.createContext(demoContext);
+vm.runInContext(fs.readFileSync(__dirname+'/demo-data.js','utf8'),demoContext);
+vm.runInContext(fs.readFileSync(__dirname+'/demo-fixtures.js','utf8'),demoContext);
+vm.runInContext(fs.readFileSync(__dirname+'/competition-fields.js','utf8'),demoContext);
+vm.runInContext(source.slice(source.indexOf('const participationRuleDefaults='),source.indexOf('function fieldHtml(')),demoContext);
+vm.runInContext(source.slice(source.indexOf('function issues('),source.indexOf('let organizerTab='))+';globalThis.records=DEMO_COMPETITIONS;globalThis.schema=modules;globalThis.check=issues;',demoContext);
+for(const c of demoContext.records){demoContext.state.draft=demoContext.competitionValues(c);for(let i=0;i<demoContext.schema.length;i++)assert.equal(demoContext.check(i).length,0,c.id+' / '+demoContext.schema[i].title+' : '+demoContext.check(i).join(','));assert.ok(!demoContext.competitionFieldModules(c,[0,1,2,3,4,5]).includes('未填写'),c.id+'不应出现未填写');}
+assert.equal(demoContext.records.length,18);assert.equal(new Set(demoContext.records.map(c=>c.values.topic)).size,18);
+demoContext.state.draft={eligibility:'本比赛仅面向具备相关工程实践经验的参赛者',teamMode:'团队',teamMax:8};
+assert.equal(demoContext.check(2).length,0);assert.equal(demoContext.state.draft.teamMax,8);assert.equal(demoContext.state.draft.eligibility,'本比赛仅面向具备相关工程实践经验的参赛者');
+for(const bad of ['',0,-1,1.5,'abc',Infinity,Number.MAX_SAFE_INTEGER+1]){demoContext.state.draft.teamMax=bad;assert.ok(demoContext.check(2).length>0,'应拒绝人数上限 '+bad);}
+demoContext.state.draft={eligibility:' ',teamMode:'团队',teamMax:3};assert.ok(demoContext.check(2).some(s=>s.includes('参赛资格')));
+demoContext.state.draft={eligibility:'个人赛资格',teamMode:'仅个人参赛',teamMax:8};assert.equal(demoContext.check(2).length,0);assert.equal(demoContext.state.draft.teamMax,1);
+const individual=context.competitionValues({values:{eligibility:'自定义资格',teamMode:'仅个人参赛',teamMax:8}});assert.equal(individual.teamMode,'仅个人参赛');assert.equal(individual.teamMax,1);assert.equal(individual.eligibility,'自定义资格');
+const partSource=fs.readFileSync(__dirname+'/participation.js','utf8');const admission={reg:()=>true,teamFor:()=>undefined,fail:()=>false,invalidate(){},message(){},names:String};vm.createContext(admission);vm.runInContext(partSource.slice(partSource.indexOf('function admit('),partSource.indexOf('function perform(')),admission);
+const customTeam={members:['a','b','c','d','e'],leader:'a',name:'团队'};assert.equal(admission.admit({id:'x',values:{teamMax:6}},customTeam,'f'),true);assert.equal(admission.admit({id:'x',values:{teamMax:6}},customTeam,'g'),false);assert.equal(admission.admit({id:'x',values:{teamMode:'仅个人参赛',teamMax:1}},{members:['a']},'b'),false);
+const sample={adminSample:true,values:{name:'【演示】代码工程挑战赛',domain:'科学推理',description:'后台演示',organizer:'演示组',pool:30000,registrationStart:'2026-11-01T09:00',registrationEnd:'2026-11-15T18:00',submissionStart:'2026-11-16T09:00',submissionEnd:'2026-12-06T18:00'}};
+demoContext.completeAdminDemoFields(sample);assert.equal(sample.values.domain,'代码工程');assert.ok(sample.values.topic&&sample.values.environment&&sample.values.contact&&sample.values.fields&&sample.values.scale);
+const real={values:{name:'普通创建记录'}};demoContext.completeAdminDemoFields(real);assert.equal(real.values.topic,undefined);
+const timeValues={registrationStart:'2026-11-01T09:00',registrationEnd:'2026-11-11T09:00',submissionStart:'2026-11-12T09:00',submissionEnd:'2026-11-22T09:00'};
+const at=time=>Date.parse(time+'+08:00');
+let timeline=context.competitionTimelineState(timeValues,at('2026-10-31T09:00'));assert.equal(timeline.active,-1);assert.equal(timeline.points.filter(p=>p.status==='upcoming').length,4);
+timeline=context.competitionTimelineState(timeValues,at('2026-11-06T09:00'));assert.equal(timeline.active,0);assert.equal(timeline.points[0].progress,50);assert.equal(timeline.phase,'报名与组队中');
+timeline=context.competitionTimelineState(timeValues,at('2026-11-11T09:00'));assert.equal(timeline.active,1);assert.equal(timeline.points[0].status,'reached');assert.equal(timeline.points[1].status,'current');
+timeline=context.competitionTimelineState({...timeValues,submissionStart:timeValues.registrationEnd},at('2026-11-11T09:00'));assert.equal(timeline.active,2);
+timeline=context.competitionTimelineState(timeValues,at('2026-11-23T09:00'));assert.equal(timeline.active,3);assert.equal(timeline.points[3].progress,0);assert.equal(timeline.points.filter(p=>p.status==='unknown').length,2);assert.equal(timeline.phase,'审核收尾与补正中');
+assert.equal(context.competitionTimelineState({},Date.now()).active,-1);
+const timelineHTML=context.competitionTimeline(timeValues,at('2026-11-06T09:00'));assert.equal(timelineHTML.split('data-timeline-key=').length-1,6);assert.equal(timelineHTML.split('aria-current="step"').length-1,1);assert.ok(timelineHTML.includes('--segment-progress:50.00%'));
+const finalDates={...timeValues,correctionEnd:'2026-11-25T09:00',publicationAt:'2026-11-28T09:00'};
+assert.equal(context.competitionTimelineState(finalDates,at('2026-11-25T09:00')).active,4);
+assert.equal(context.competitionTimelineState(finalDates,at('2026-11-28T09:00')).phase,'结果公示中');
+assert.equal(context.competitionFieldValue('correctionEnd','2026-11-25T01:00:00Z','datetime-local'),'2026-11-25 09:00');
+assert.equal(context.competitionFieldValue('correctionEnd','','pending'),'待确定');
+console.log('Passed: all creation fields map once to the correct tabs, original text and missing fields, platform rules, date/money formatting, config aliases, published projection, escaping and team interaction.');
+console.log('Passed: all 18 demo competitions pass creation-form validation, topics are distinct, marked admin samples are complete, ordinary creator data is preserved.');
+console.log('Passed: six timepoints, Beijing time, before start, partial progress, exact boundaries, coincident events, after submission deadline and unknown correction/publication dates.');

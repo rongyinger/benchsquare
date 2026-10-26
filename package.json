@@ -1,0 +1,11 @@
+{
+  "name": "benchsquare",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Benchsquare 本地交互演示，沿用原生 JavaScript 技术栈",
+  "scripts": {
+    "dev": "node frontend/serve.cjs",
+    "build": "node frontend/build.cjs",
+    "test": "node frontend/competition-fields.test.cjs && node frontend/creation-workflow.test.cjs && node frontend/admin-workflow.test.cjs && node frontend/submission-model.test.cjs && node frontend/workbench-model.test.cjs"
+  }
+}

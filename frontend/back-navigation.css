@@ -1,0 +1,9 @@
+.page-backbar{display:flex;align-items:center;gap:18px;margin:0 0 24px;padding:10px 0 14px;border-bottom:1px solid #ecece4;background:#fff;position:sticky;top:76px;z-index:12}
+.page-backbar .page-back{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;margin:0;padding:10px 18px;border:1px solid #e3d486;border-radius:9px;background:#fff9df;color:#514314;font-size:14px;font-weight:600;line-height:1.5;text-decoration:none;white-space:nowrap;box-shadow:0 2px 4px #54410a08;transition:background .15s,border-color .15s}
+.page-backbar .page-back:hover{background:#fff0ac;border-color:#baa44f;color:#32290d}.page-backbar .page-back:focus-visible{outline:3px solid #b99327;outline-offset:3px}
+.page-back svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.page-back-context{font-size:12px;color:#878b7d}.page-backbar+.submission-context{margin-top:-8px}
+#app>.page-backbar{top:0;background:#fafaf8}#app>.page-backbar~.breadcrumb{display:none}
+.audit-detail-header [data-admin="close-detail"]{font-size:13px!important;min-width:100px;min-height:40px!important;padding:8px 14px!important;border:1px solid #e3d486!important;background:#fff9df!important;border-radius:8px!important;color:#514314!important}
+@media(max-width:760px){.page-backbar{top:68px;margin-bottom:20px;gap:12px}.page-backbar .page-back{font-size:13px;padding:10px 14px}.page-back-context{font-size:11px}}
+@media(max-width:430px){.page-backbar{top:99px}.page-back-context{margin-left:auto}#app>.page-backbar{top:0}}

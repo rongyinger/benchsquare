@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict'),W=require('./workbench-model.js');
+const c={id:'c',stage:'已发布',start:'2026-10-21T09:00:00+08:00',end:'2026-11-30T18:00:00+08:00'};
+const s={competitions:[c],participation:{active:'member',regs:{c:{member:{},leader:{}}},teams:[{id:'t',cid:'c',leader:'leader',members:['leader','member']}]}};
+const x=W.context(s,'c','t');
+assert.equal(W.phase(c,null,Date.parse(c.start)-1),'before');assert.equal(W.phase(c,null,Date.parse(c.start)),'open');assert.equal(W.phase(c,null,Date.parse(c.end)),'closed');assert.equal(W.phase({},null),'unknown');
+assert.equal(W.permission(x,'open'), '');assert.equal(W.permission(x,'open',true),'');assert.match(W.permission(x,'closed'),/已截止/);assert.match(W.permission(x,'before'),/尚未开始/);
+s.participation.active='leader';assert.equal(W.permission(W.context(s,'c','t'),'open',true),'');
+assert.match(W.permission(W.context(s,'c','other'),'open'),/创建或加入团队/);assert.match(W.permission(W.context(s,'missing','t'),'open'),/不存在/);
+assert.equal(W.belongs({competitionId:'c',teamId:'t'},'c','t'),true);assert.equal(W.belongs({competitionId:'c',teamId:'other'},'c','t'),false);assert.equal(W.belongs({},'c','t'),false);
+const late={...x,competition:{...c,values:{submissionStart:new Date(Date.now()-172800000).toISOString(),submissionEnd:new Date(Date.now()-86400000).toISOString(),correctionEnd:new Date(Date.now()+86400000).toISOString()}}};
+assert.equal(W.permission(late,'real',true,{status:'需修改'}),'');
+assert.match(W.permission(late,'real',true,null),/已截止/);
+late.competition.values.correctionEnd='';assert.match(W.permission(late,'real',true,{status:'需修改'}),/未公布/);
+assert.equal(W.taskStatus('已提交'),'待初审');assert.equal(W.taskStatus('待质检'),'待初审');
+console.log('Workbench model: exact time boundaries, individual submission permissions, missing schedule, competition/team access and record isolation passed.');

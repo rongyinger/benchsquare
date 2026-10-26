@@ -1,0 +1,26 @@
+# Publish the demo source and its required assets only.
+/*
+!/.gitignore
+!/README.md
+!/package.json
+!/.github/
+!/frontend/
+!/docs/
+/docs/*
+!/docs/architecture/
+/docs/architecture/*
+!/docs/architecture/noto-sans-sc-regular.ttf
+!/docs/architecture/roboto-regular.ttf
+
+node_modules/
+*.log
+.env
+.env.*
+frontend/*-preview.jpg
+frontend/*-preview.png
+frontend/preview.jpg
+frontend/competition-fields-overview.jpg
+frontend/competition-fields-rules.jpg
+frontend/competition-overview-polished.jpg
+frontend/competition-schedule-polished.jpg
+frontend/competition-timepoint-progress.jpg
