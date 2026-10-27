@@ -39,7 +39,7 @@
     }else if(root==='workbench'){href='#mine';label='返回我的比赛';caption='比赛工作台';}
     else if(root==='create'){href='#organizer';label='返回主办方中心';caption='创建比赛';}
     else if(root==='admin'){href='#organizer';label='返回用户端';caption='管理后台';}
-    else caption=({explore:'赛事广场',mine:'我的比赛',organizer:'主办方中心',community:'社区'})[root]||'';
+    else caption=({'data-dashboard':'个人数据看板',explore:'赛事广场',mine:'我的比赛',organizer:'主办方中心',community:'社区'})[root]||'';
     insert(document.querySelector('#main'),href,label,caption);
   }
   const previous=render;render=function(){previous();decorate();};decorate();

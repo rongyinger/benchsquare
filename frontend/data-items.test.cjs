@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict'),D=require('./data-items.js'),M=require('./data-mocks.js');
+const mine=M.generate('rong'),other=M.generate('xu'),store={records:[...mine,...other]};
+assert.equal(D.list(store,'rong').length,12);
+for(const stage of D.statuses)assert.equal(mine.filter(r=>D.status(r)===stage).length,3);
+assert.equal(new Set([...mine,...other].map(r=>r.id)).size,24);
+assert.equal(JSON.stringify(M.generate('rong')),JSON.stringify(mine));
+assert.ok(D.drafts(mine,'code').every(r=>!r.competitionId||r.competitionId==='code'));
+assert.ok(D.drafts(mine,'code').some(r=>!r.competitionId));
+assert.equal(D.filter(mine,{competition:'code',stage:'已审核',search:'dependency'}).length,1);
+assert.equal(D.filter(mine,{competition:'unbound'}).length,1);
+const adopted=mine.at(-1),snapshot=JSON.stringify(adopted.history);adopted.draftForm={...adopted.form,description:'changed'};
+assert.equal(D.status(adopted),'草稿');assert.equal(JSON.stringify(adopted.history),snapshot);assert.equal(adopted.reviews.length,2);
+assert.equal(JSON.parse(mine[0].form.attachments[2].content).mock,true);assert.ok(mine[0].form.attachments[0].content.includes('\nid,value\n'));
+console.log('Data items passed: ownership, four states, stable examples, draft eligibility, combined filters and frozen review history.');

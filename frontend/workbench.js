@@ -14,6 +14,7 @@
   }
   function requestClose(){drawer?.querySelector('iframe').contentWindow.postMessage({type:'submission-close-request'},location.origin);}
   function open(cid){
+    if(window.DataDashboard){window.DataDashboard.openCompetition(cid);return;}
     const x=ctx(cid);if(!x.team||!x.registered){toast('请先报名并完成组队。');return;}
     if(drawer)return;
     opener=document.activeElement;previousOverflow=document.body.style.overflow;
