@@ -61,7 +61,7 @@
       field('estimatedScore','预估得分 · Estimated score',single('estimatedScore',M.scores),'估计强模型在本任务上的完成率或得分率。可不选择。')+uploadGroup('evidence'))}
     ${section(5,'提交确认','两个确认框均勾选后，可以提交审核。',
       `<label class="consent"><input type="checkbox" id="f-consent" name="consent" ${form.consent?'checked':''}><span>我确认该工作流可用于 Agents’ Last Exam 评测。<b class="required">*</b></span></label><p class="error" id="err-consent" role="alert"></p><label class="consent terms-confirm"><input type="checkbox" id="f-terms" name="terms" ${form.terms?'checked':''}><span>我已阅读并同意条款与条件（Terms and Conditions）。<b class="required">*</b></span></label><p class="error" id="err-terms" role="alert"></p><details class="demo-terms"><summary>查看条款与条件（演示）</summary><p>仅提交你有权提供的任务、素材与参考结果，并允许用于本次评测。请勿包含未经授权的个人或保密信息。</p><p>此确认仅演示表单流程，不构成向 ALE 官方提交或真实协议签署；正式接入时以平台公布的条款为准。</p></details><p class="hint">本 Demo 仅在当前浏览器保存记录，不实际上传附件、不向 ALE 或网盘发送数据。</p>`)}
-    <div class="action-bar"><span id="save-state"></span><div>${btn('save','保存草稿')}${btn('preview','预览任务')}${btn('submit',editingId?'保存并重新提交':'提交审核',true)}</div></div></form></div></div>`;
+    <div class="action-bar"><span id="save-state"></span><div>${btn('save','保存草稿')}${btn('preview','预览任务')}${btn('submit','提交审核',true)}</div></div></form></div></div>`;
   }
 
   const read=(label,value)=>`<div class="read-field"><h4>${label}</h4><div>${E(value||'未填写')}</div></div>`;
