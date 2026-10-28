@@ -15,9 +15,22 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
  await p.getByRole('button',{name:'按状态',exact:true}).click();assert.equal(await p.locator('.dd-column').count(),4);
  await p.locator('#dd-search').fill('dependency_conflict');assert.equal(await p.locator('.dd-task-card').count(),1);assert.deepEqual(await p.locator('.dd-metric strong').allTextContents(),['3','3','3','3']);
  await p.getByRole('button',{name:'清除筛选',exact:true}).click();await p.getByRole('button',{name:'按比赛',exact:true}).click();
- const accepted=(await read()).records.find(r=>r.form.name==='thermal_boundary_accepted_03');const original=JSON.stringify(accepted.history);
+ for(const lockedName of ['thermal_boundary_accepted_03','api_retry_review_01','material_strength_qualified_03','chart_units_rejected_02']){
+ const locked=(await read()).records.find(r=>r.form.name===lockedName),lockedSnapshot=JSON.stringify(locked);
+ assert.equal(await p.locator('.dd-table th').filter({hasText:'提交版本'}).count()>0,true);
+ assert.equal(await p.locator('[data-data="edit"][data-id="'+locked.id+'"]').innerText(),'查看详情 →');
+ await p.locator('[data-data="edit"][data-id="'+locked.id+'"]').click();await f().locator('.detail-meta').waitFor();
+ assert.equal(await f().locator('[data-do^="edit:"]').count(),0);assert.ok(await f().locator('[data-do^="history:"]').count()>0);
+ await f().locator('[data-do^="history:"]').first().click();await f().locator('#preview[open]').waitFor();await f().locator('#close-preview').click();
+ const lockedDownload=p.waitForEvent('download');await f().locator('[data-download]').first().click();await lockedDownload;
+ const lockedFrame=p.frames().find(frame=>frame.url().includes('submission.html'));await lockedFrame.goto(lockedFrame.url().replace(/#.*$/,'#new'));
+ await f().locator('.detail-meta').waitFor();assert.equal(await f().locator('#task-form').count(),0);
+ await lockedFrame.evaluate(()=>{for(const action of ['save','submit']){const b=document.createElement('button');b.dataset.do=action;document.body.append(b);b.click();b.remove();}});
+ assert.equal(JSON.stringify((await read()).records.find(r=>r.id===locked.id)),lockedSnapshot);await close();
+ }
+ const accepted=(await read()).records.find(r=>r.form.name==='dependency_conflict_01');const original=JSON.stringify(accepted.history);
  await p.locator('[data-data="edit"][data-id="'+accepted.id+'"]').click();await f().locator('#f-name').waitFor();await f().locator('#f-description').fill('Revised working copy');await f().getByRole('button',{name:'保存草稿',exact:true}).click();
- await p.waitForTimeout(200);const edited=(await read()).records.find(r=>r.id===accepted.id);assert.equal(edited.status,'已通过');assert.equal(edited.draftForm.description,'Revised working copy');assert.equal(JSON.stringify(edited.history),original);assert.equal(edited.reviews.length,2);await close();
+ await p.waitForTimeout(200);const edited=(await read()).records.find(r=>r.id===accepted.id);assert.equal(edited.status,'已审核');assert.equal(edited.draftForm.description,'Revised working copy');assert.equal(JSON.stringify(edited.history),original);assert.equal(edited.reviews.length,1);await close();
  await p.locator('.dd-heading-actions [data-data="new"]').click();await f().locator('#f-name').waitFor();await f().locator('#f-name').fill('saved_unbound');await f().locator('[data-upload="input"]').setInputFiles({name:'input.txt',mimeType:'text/plain',buffer:Buffer.from('persistent payload')});await f().getByRole('button',{name:'保存草稿',exact:true}).click();await p.waitForTimeout(200);let unbound=(await read()).records.find(r=>r.form.name==='saved_unbound');assert.ok(unbound&&!unbound.competitionId);await close();
  await p.reload();await p.locator('[data-data="detail"][data-id="'+unbound.id+'"]').click();await f().locator('[data-download]').waitFor();const dl=p.waitForEvent('download');await f().locator('[data-download]').first().click();assert.equal((await dl).suggestedFilename(),'input.txt');await close();
  await p.goto(base+'#mine');await p.locator('[data-wb="demo"]').click();await p.locator('[data-dd-draft="'+unbound.id+'"]').waitFor();const before=JSON.stringify((await read()).records.find(r=>r.id===unbound.id));await p.locator('[data-dd-draft="'+unbound.id+'"]').click();await f().locator('#f-name').waitFor();assert.equal(JSON.stringify((await read()).records.find(r=>r.id===unbound.id)),before);await close();

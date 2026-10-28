@@ -28,7 +28,7 @@
     const route=location.hash||'#discover',[root,cid]=route.slice(1).split('/');
     if(route!==lastRoute){if(root==='competition'&&lastRoute&&!lastRoute.startsWith('#competition/')){origins[route]=lastRoute;try{sessionStorage.setItem('benchsquare-back-origins',JSON.stringify(origins));}catch{}}lastRoute=route;}
     let href='#discover',label='返回首页',caption='';
-    if(root==='discover')return;
+    if(root==='discover'||root==='data-dashboard')return;
     if(root==='competition'){
       const from=origins[route]||'#explore';
       if(from==='#mine'){href='#mine';label='返回我的比赛';}
