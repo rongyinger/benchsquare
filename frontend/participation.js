@@ -17,7 +17,35 @@ function started(c){return Date.now()>=new Date(c.start).getTime();}
 function message(to,c,text,tab='报名的比赛'){db.messages.unshift({id:key(),to,cid:c.id,text,time:stamp(),read:false,tab});}
 function invalidate(cid,user){for(const r of [...db.applications,...db.invites])if(r.cid===cid&&r.user===user&&r.status==='pending')r.status='invalid';}
 function settle(){let changed=false;for(const c of all()){if(!locked(c))continue;for(const r of [...db.applications,...db.invites])if(r.cid===c.id&&r.status==='pending'){r.status='invalid';changed=true;}for(const user of Object.keys(db.regs[c.id]||{})){const r=reg(c.id,user);if(!r.deadlineNotified){message(user,c,teamFor(c.id,user)?'报名组队已截止，团队与队长已锁定。':'未在截止前完成组队，报名已失效。');r.deadlineNotified=true;changed=true;}}}if(changed)save();}
-function initialize(){for(const c of all()){
+// Seed complete, fictional examples once; preserve existing registrations and teams.
+function seedMineExamples(){
+ if(db.mineExamplesVersion>=2)return;
+ const day=86400000,now=Date.now(),date=offset=>new Date(now+offset*day+8*3600000).toISOString().slice(0,10)+'T18:00:00+08:00';
+ const examples=[
+  ['forming','金融分析','企业现金流分析 · 组队示例',3,5,20,28,false],
+  ['upcoming','多模态','跨页图表理解 · 待开赛示例',-1,3,18,26,true],
+  ['active','代码工程','仓库缺陷修复 · 进行中示例',-8,-6,10,18,true],
+  ['review','科学推理','实验误差分析 · 审核补正示例',-20,-18,-2,6,true],
+  ['finished','法律实务','合同条款比对 · 已结束示例',-35,-33,-15,-3,true],
+  ['expired','医疗健康','循证检索任务 · 报名失效示例',-3,-1,14,22,false]
+ ];
+ for(const [slug,domain,title,deadline,start,end,publication,hasTeam] of examples){
+  const id='mine-example-'+slug;
+  const existing=state.competitions.some(c=>c.id===id);
+  const values=demoCompetitionFields({id,title,domain,org:'Benchsquare 演示工作组',desc:'用于体验参赛状态分类的虚构示例赛事。',prize:30000,registrationStart:date(Math.min(deadline-10,-10)),deadline:date(deadline),start:date(start),end:date(end)});
+  Object.assign(values,{correctionEnd:date(publication-2),publicationAt:date(publication)});
+  if(!existing)state.competitions.push({id,stage:'已发布',ownerId:'demo-organizer',mineStatusExample:true,values});
+  db.regs[id] ||= {};
+  for(const user of users){
+   // A version-one example may already have been edited by the default user.
+   if(existing&&user.id==='rong')continue;
+   db.regs[id][user.id] ||= {at:Date.parse(values.registrationStart)+day,rulesVersion:1};
+   if(hasTeam&&!teamFor(id,user.id))db.teams.push({id:id+'-team-'+user.id,cid:id,name:domain+'共创队',description:'参赛状态演示团队',leader:user.id,members:[user.id],allow:false});
+  }
+ }
+ db.mineExamplesVersion=2;
+}
+function initialize(){seedMineExamples();for(const c of all()){
  db.regs[c.id] ||= {};
  const legacy=state.registrations[c.id];
  if(legacy&&!db.regs[c.id].rong){db.regs[c.id].rong={at:legacy.registeredAt||Date.now(),rulesVersion:1};if(legacy.team)db.teams.push({id:key(),cid:c.id,name:legacy.team,description:legacy.description||'',leader:'rong',members:['rong'],allow:true});}
@@ -41,7 +69,33 @@ teamContent=function(c){const r=reg(c.id),t=teamFor(c.id);if(!r)return `<h2>先�
 detailContent=function(c){return oldContent(c).replace('不支持退出、移除成员、队长移交或团队合并。','截止前支持普通成员退队、队长移除成员及移交队长；截止后全部锁定。不支持团队解散、合并或同时加入多队。');};
 let mineTab='报名的比赛';
 function records(kind){const list=(kind==='组队邀请'?db.invites:db.applications).filter(r=>r.user===uid());return list.map(r=>{const c=find(r.cid),t=db.teams.find(t=>t.id===r.tid);if(!c)return '';return `<article class="participation-card"><div class="participation-row"><h3>${esc(t?.name||'原团队')}</h3>${pill(r.status==='pending'&&kind==='组队邀请'?'待接受':status(r))}</div><a href="#competition/${c.id}">${esc(c.title)}</a><p>队长：${esc(names(t?.leader))} ${t?`<button class="expert-person-link" data-expert="person" data-user="${t.leader}">查看名片</button>`:""} · ${esc(r.time)}</p>${r.result?'<p>'+esc(r.result)+'</p>':''}<div class="participation-actions">${r.status==='pending'?(kind==='组队邀请'?act('accept','同意邀请',c.id,`data-record="${r.id}"`,locked(c))+act('reject-invite','拒绝邀请',c.id,`data-record="${r.id}"`,locked(c)):act('cancel-app','撤销申请',c.id,`data-tid="${r.tid}"`,locked(c))):''}</div></article>`;}).join('')||`<div class="empty"><h3>暂无${kind}</h3><p>邀请和申请的处理进度会同步显示在这里与通知中心。</p></div>`;}
-mine=function(){const list=all().filter(c=>reg(c.id));return heading('我的比赛','管理报名、组队邀请与入队申请，及时查看处理结果。')+`<div class="tabs" role="tablist">${['报名的比赛','组队邀请','我的申请'].map(t=>`<button class="tab ${mineTab===t?'active':''}" role="tab" aria-selected="${mineTab===t}" data-part="mine-tab" data-value="${t}">${t}${t==='报名的比赛'?'':`（${(t==='组队邀请'?db.invites:db.applications).filter(r=>r.user===uid()&&r.status==='pending').length}）`}</button>`).join('')}</div>`+(mineTab==='报名的比赛'?list.map(c=>{const t=teamFor(c.id);return `<article class="participation-card"><div class="participation-row"><h3>${esc(c.title)}</h3>${pill(t?(locked(c)?'已参赛 · 已锁定':'已参赛'):(locked(c)?'报名失效':'待组队'))}</div><p>${t?'我的团队：'+esc(t.name)+' · '+t.members.length+' 人':'尚未加入团队'} · 报名组队截止 ${esc(displayDemoDate(c.deadline))}</p><a class="button dark" href="#competition/${c.id}">${t?'查看团队与赛事':'前往完成组队'}</a></article>`;}).join('')||'<div class="empty"><h3>还没有报名比赛</h3><a class="button" href="#explore">探索赛事</a></div>':records(mineTab));};
+const mineStages=[
+ {id:'forming',label:'待组队',hint:'报名成功，完成组队后正式参赛',time:'报名组队截止',field:'deadline',action:'完成组队'},
+ {id:'upcoming',label:'待开赛',hint:'团队已就绪，等待任务提交开放',time:'任务提交开始',field:'start',action:'查看团队与赛事'},
+ {id:'active',label:'进行中',hint:'跟进任务提交、审核与补正进度',time:'新增提交截止',field:'end',action:'查看赛事并提交'},
+ {id:'review',label:'审核与补正中',hint:'关注审核意见，按要求处理补正',time:'补正截止',field:'correctionEnd',action:'查看赛事',secondary:'查看提交与审核进度'},
+ {id:'finished',label:'已结束',hint:'比赛已结束，可回顾赛事与个人审核记录',time:'结果公示',field:'publicationAt',action:'查看赛事',secondary:'查看个人审核结果'},
+ {id:'expired',label:'报名失效',hint:'截止前未完成组队，保留报名记录',time:'报名组队已截止',field:'deadline',action:'查看赛事'}
+];
+function mineStage(c){
+ if(!teamFor(c.id))return locked(c)?'expired':'forming';
+ const now=Date.now(),publication=Date.parse(c.values?.publicationAt),end=Date.parse(c.end);
+ if(Number.isFinite(publication)&&now>=publication)return 'finished';
+ if(now>=end)return Number.isFinite(publication)?'review':c.status==='已结束'?'finished':'review';
+ return started(c)?'active':'upcoming';
+}
+function mineCard(c,stage){
+ const t=teamFor(c.id),example=state.competitions.some(item=>item.id===c.id&&item.mineStatusExample);
+ const time=c[stage.field]||c.values?.[stage.field];
+ return `<article class="participation-card mine-card"><div class="mine-card-heading"><h3><a href="#competition/${esc(c.id)}">${esc(c.title)}</a>${example?'<span class="mine-example">示例</span>':''}</h3><div class="mine-card-labels">${stage.id==='review'?pill('审核与补正中','mine-review-status'):''}${t&&locked(c)?'<span class="mine-team-lock">团队已锁定</span>':''}</div></div><p class="mine-card-team">${t?'我的团队：'+esc(t.name)+' · '+t.members.length+' 人':'尚未加入团队'}</p><div class="mine-card-footer"><span class="mine-card-time">${time?esc(stage.time)+' '+esc(displayDemoDate(time)):stage.id==='finished'?'比赛已结束，公示时间待公布':'公示时间待公布，请关注赛事通知'}</span><div class="mine-card-actions">${stage.id==='expired'?`<button class="mine-delete" data-part="delete-expired" data-cid="${esc(c.id)}">删除</button>`:''}${stage.secondary?`<a class="mine-secondary" href="#data-dashboard">${stage.secondary} ↗</a>`:''}<a class="button ${['forming','active'].includes(stage.id)?'dark':''}" href="#competition/${esc(c.id)}">${stage.action} →</a></div></div></article>`;
+}
+function mineGroups(list){
+ if(!list.length)return '<div class="empty"><h3>还没有报名比赛</h3><a class="button" href="#explore">探索赛事</a></div>';
+ const categories=mineStages.filter(s=>s.id!=='review'),groups=new Map(categories.map(s=>[s.id,[]]));
+ list.forEach(c=>{const stage=mineStage(c);groups.get(stage==='review'?'active':stage).push(c);});
+ return '<div class="mine-groups">'+categories.map(stage=>{const items=groups.get(stage.id);return `<section class="mine-group mine-group-${stage.id}" aria-labelledby="mine-group-${stage.id}"><header class="mine-group-heading"><div><h2 id="mine-group-${stage.id}"><i aria-hidden="true"></i>${stage.label}<span class="mine-group-count">${items.length}</span></h2><p>${stage.hint}</p></div></header>${items.length?items.map(c=>mineCard(c,mineStages.find(s=>s.id===mineStage(c)))).join(''):'<p class="mine-group-empty">暂无'+stage.label+'的比赛</p>'}</section>`;}).join('')+'</div>';
+}
+mine=function(){const list=all().filter(c=>reg(c.id)&&!(db.hiddenExpired?.[uid()]?.includes(c.id)&&mineStage(c)==='expired'));return heading('我的比赛','管理报名、组队邀请与入队申请，及时查看处理结果。')+`<div class="tabs" role="tablist">${['报名的比赛','组队邀请','我的申请'].map(t=>`<button class="tab ${mineTab===t?'active':''}" role="tab" aria-selected="${mineTab===t}" data-part="mine-tab" data-value="${t}">${t}${t==='报名的比赛'?'':`（${(t==='组队邀请'?db.invites:db.applications).filter(r=>r.user===uid()&&r.status==='pending').length}）`}</button>`).join('')}</div>`+(mineTab==='报名的比赛'?mineGroups(list):records(mineTab));};
 function notices(){const ops=state.notices.filter(n=>(n.to||'rong')===uid());const msgs=db.messages.filter(m=>m.to===uid());modal(`<h2>通知中心</h2><p>当前用户：${esc(names(uid()))} · ${msgs.filter(m=>!m.read).length+ops.filter(n=>!n.read).length} 条未读</p>${act('read-all','全部标为已读','')}<div class="participation-messages">${msgs.map(m=>`<div class="participation-card ${m.read?'':'unread'}"><strong>${esc(m.text)}</strong><p>${esc(find(m.cid)?.title||'比赛')} · ${esc(m.time)}</p><button class="button" data-part="open-notice" data-record="${m.id}">查看详情</button></div>`).join('')||'<p>暂无通知。</p>'}</div>${state.notices.some(n=>(n.to||'rong')===uid())?'<details open><summary>赛事审核与发布通知</summary>'+state.notices.filter(n=>(n.to||'rong')===uid()).slice(0,20).map(n=>'<p>'+esc(n.message)+' · '+esc(n.time)+'</p>').join('')+'</details>':''}`);}
 function profile(){modal(`<h2>${esc(names(uid()))}</h2><p>个人中心</p><div class="participation-actions"><a class="button" href="#mine" data-part="profile-mine">我的比赛</a>${act('notices','通知中心','')}${window.competitionAdmin?.profileLink()||''}</div><h3>原型演示设置</h3><p>仅用于当前浏览器的多角色流程验证，示例用户与消息不会发送到外部。</p><label class="field">切换演示身份<select id="participation-user">${users.map(u=>`<option value="${u.id}" ${u.id===uid()?'selected':''}>${u.name}</option>`).join('')}</select></label><label class="field">当前比赛的截止场景<select id="participation-clock"><option value="real">真实时间</option><option value="locked">模拟报名截止</option></select></label>${act('save-settings','应用演示设置',currentId)}<p class="participation-hint">模拟截止会按规则使待处理申请与邀请失效；切回真实时间不恢复失效记录。</p>`);$('#participation-clock').value=db.scenarios[currentId]||'real';}
 render=function(){settle();oldRender();const c=find(currentId);if(c){const r=reg(c.id),t=teamFor(c.id),notice=$('#main .detail-heading + .notice');if(notice&&r){notice.textContent=t?'你已正式参赛 · '+t.name+' · '+t.members.length+' 人 · '+(locked(c)?'团队已锁定':'组队中'):locked(c)?'报名失效：未在截止前完成组队。':'报名成功，当前状态：待组队。请创建或加入团队。';}if(db.scenarios[c.id])$('#main').insertAdjacentHTML('afterbegin','<div class="notice warn">演示场景：报名组队已截止。可在左侧底部的演示设置中切回真实时间。</div>');}const unread=db.messages.filter(m=>m.to===uid()&&!m.read).length+state.notices.filter(n=>(n.to||'rong')===uid()&&!n.read).length;document.querySelectorAll('.notification-dot').forEach(n=>{n.style.display=unread?'block':'none';});document.querySelectorAll('[data-action="notifications"]').forEach(n=>n.setAttribute('aria-label','通知'+(unread?'（'+unread+'条未读）':'')));document.querySelectorAll('.profile').forEach(n=>{n.firstChild.textContent=names(uid()).slice(0,1);n.title=names(uid());});};
@@ -59,7 +113,16 @@ function perform(a,c,b){const t=c&&teamFor(c.id),target=db.teams.find(t=>t.id===
  save();close();render();toast('操作成功，状态与通知已同步。');}
 document.addEventListener('click',e=>{const part=e.target.closest('[data-part]');if(part){e.preventDefault();e.stopImmediatePropagation();settle();perform(part.dataset.part,find(part.dataset.cid||currentId),part);return;}const b=e.target.closest('[data-action]');if(!b)return;const action=b.dataset.action,c=find(b.dataset.id||currentId);if(['profile','notifications','register','confirm-register','create-team','apply-team','cancel-application'].includes(action)){e.preventDefault();e.stopImmediatePropagation();if(action==='profile')return profile();if(action==='notifications')return notices();if(action==='register'){if(!c||locked(c)||c.status!=='报名中')return fail('当前不在报名期。');if(reg(c.id))return fail('你已报名。');modal(`<h2>报名参加比赛</h2><p>${esc(c.title)}</p><div class="review-summary"><p><b>参赛资格：</b>${esc(c.values.eligibility)}</p><p><b>参赛形式：</b>${esc(c.values.teamMode)}</p><p><b>人数上限：</b>${esc(c.values.teamMax)} 人</p></div><div class="notice">报名后需创建或加入团队。截止前支持退队、队长移除成员和移交队长；截止后全部锁定。</div><label class="check"><input id="participation-rules" type="checkbox">我已阅读并同意比赛规则与数据许可（v1.0）</label>${act('register-submit','确认报名',c.id)}`);return;}if(c)perform(action==='create-team'?'create':action==='apply-team'?'apply':'cancel-app',c,b);}},true);
 // Registration handled separately so agreement is always explicitly checked.
-const originalPerform=perform;perform=function(a,c,b){if(a==='register-submit'){if(!allowed(c)||!$('#participation-rules')?.checked)return fail('请先阅读并同意比赛规则。');if(!reg(c.id)){db.regs[c.id] ||= {};db.regs[c.id][uid()]={at:Date.now(),rulesVersion:1};message(uid(),c,'报名成功，请在截止前完成组队。');save();}close();detailTab='团队';go('#competition/'+c.id);toast('报名成功，请继续完成组队。');return;}return originalPerform(a,c,b);};
+const originalPerform=perform;perform=function(a,c,b){
+ if(a==='delete-expired'){
+  if(!c||!reg(c.id)||mineStage(c)!=='expired')return fail('仅可删除本人报名失效的比赛。');
+  db.hiddenExpired ||= {};const removed=db.hiddenExpired[uid()] ||= [];
+  if(removed.includes(c.id))return;
+  removed.push(c.id);
+  if(!persist()){removed.pop();return;}
+  render();toast('已从我的比赛删除。');return;
+ }
+if(a==='register-submit'){if(!allowed(c)||!$('#participation-rules')?.checked)return fail('请先阅读并同意比赛规则。');if(!reg(c.id)){db.regs[c.id] ||= {};db.regs[c.id][uid()]={at:Date.now(),rulesVersion:1};message(uid(),c,'报名成功，请在截止前完成组队。');save();}close();detailTab='团队';go('#competition/'+c.id);toast('报名成功，请继续完成组队。');return;}return originalPerform(a,c,b);};
 document.addEventListener('submit',e=>{const f=e.target;if(!['participation-create','participation-apply'].includes(f.id))return;e.preventDefault();e.stopImmediatePropagation();const c=find(f.dataset.cid),data=new FormData(f);if(!allowed(c)||!reg(c.id)||teamFor(c.id))return fail('当前不能创建或申请团队。');if(f.id==='participation-create'){const name=String(data.get('name')||'').trim();if(!name||name.length>30)return fail('请输入不超过30字的团队名称。');db.teams.push({id:key(),cid:c.id,name,description:String(data.get('description')||''),leader:uid(),members:[uid()],allow:c.values?.teamMode!=='仅个人参赛'&&data.has('allow')});invalidate(c.id,uid());message(uid(),c,'团队「'+name+'」创建成功，你已正式参赛。');}else {if(c.values?.teamMode==='仅个人参赛')return fail('本比赛仅限个人参赛，请创建单人团队。');const t=db.teams.find(t=>t.id===f.dataset.tid);if(!t?.allow||t.cid!==c.id||t.members.length>=Number(c.values?.teamMax||5))return fail('该团队当前不可申请。');if(db.applications.some(r=>r.tid===t.id&&r.user===uid()&&r.status==='pending'))return fail('已有审批中的申请。');db.applications.push({id:key(),cid:c.id,tid:t.id,user:uid(),status:'pending',text:String(data.get('reason')||''),time:stamp()});message(t.leader,c,names(uid())+'申请加入「'+t.name+'」。');message(uid(),c,'申请已提交，等待队长审批。','我的申请');}save();close();render();toast('已保存，通知已同步。');},true);
 window.addEventListener('storage',e=>{if(e.key===storageKey){try{const latest=JSON.parse(e.newValue);if(latest?.participation){Object.assign(db,latest.participation);render();}}catch{}}});
 setInterval(()=>{const c=find(currentId);if(c&&reg(c.id)&&locked(c)&&!reg(c.id).deadlineNotified)render();},15000);
