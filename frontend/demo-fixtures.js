@@ -19,7 +19,7 @@ function demoCompetitionFields(c){
     registrationStart:c.registrationStart,registrationEnd:c.deadline,submissionStart:c.start,submissionEnd:c.end,
     materials:c.deliverables||'完整任务说明、输入材料、参考成果、解决过程、评分细则与数据来源说明。',environment:profile.environment,formats:profile.formats,
     fields:'必填栏目包括任务编号、名称、所属领域、难度、背景、目标、输入材料、预期输出、参考成果、解题过程、评分细则及数据来源与授权说明。',scale:'每次提交一道完整任务，每队最多提交10道；单个任务包不超过100MB。截止前可修改，以截止时保存的最终版本为准。',
-    pool,rankBudget:pool,rankRule:`一等奖1支团队，奖金${first.toLocaleString('zh-CN')}元；二等奖1支团队，奖金${second.toLocaleString('zh-CN')}元；三等奖1支团队，奖金${third.toLocaleString('zh-CN')}元。团队成绩取验收通过的得分最高3道任务的平均分；不足3道不参与排名。并列时依次比较准确性、推理与依据得分，仍相同则由评审组复核。`,
+    pool,rankBudget:pool,rankRule:`一等奖1支团队，奖金${first.toLocaleString('zh-CN')}元；二等奖1支团队，奖金${second.toLocaleString('zh-CN')}元；三等奖1支团队，奖金${third.toLocaleString('zh-CN')}元。团队成绩取验收通过且已评分的得分最高3道任务的平均分，保留两位小数；不足3道不参与排名。同分显示并列名次（如1、2、2、4），同分团队按达到该分数的时间先后展示，时间不用于打破并列。榜单不自动决定获奖资格，并列获奖与奖金分配由评审组确认后另行公示。`,
     distribution:'初审与终检结果确认后公示获奖名单，公示期为7个自然日。异议处理完成并确认获奖资格后，预计于30个工作日内完成奖金发放。奖金为税前金额，依法代扣代缴相关税费；团队须共同确认收款人，团队内部奖金分配由成员自行协商。'};
 }
 for(const c of DEMO_COMPETITIONS)c.values=demoCompetitionFields(c);

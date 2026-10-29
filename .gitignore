@@ -11,6 +11,7 @@
 /docs/architecture/*
 !/docs/architecture/noto-sans-sc-regular.ttf
 !/docs/architecture/roboto-regular.ttf
+!/docs/leaderboard/
 
 node_modules/
 *.log

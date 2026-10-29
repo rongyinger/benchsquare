@@ -6,6 +6,6 @@
   "scripts": {
     "dev": "node frontend/serve.cjs",
     "build": "node frontend/build.cjs",
-    "test": "node frontend/competition-fields.test.cjs && node frontend/creation-workflow.test.cjs && node frontend/admin-workflow.test.cjs && node frontend/submission-model.test.cjs && node frontend/workbench-model.test.cjs && node frontend/data-items.test.cjs"
+    "test": "node frontend/competition-fields.test.cjs && node frontend/creation-workflow.test.cjs && node frontend/admin-workflow.test.cjs && node frontend/submission-model.test.cjs && node frontend/workbench-model.test.cjs && node frontend/data-items.test.cjs && node frontend/leaderboard-model.test.cjs"
   }
 }

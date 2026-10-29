@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1180" viewBox="0 0 1400 1180">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#8c94a2" stroke-width="1.5"/></marker><style>text{font-family:'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#283142;font-size:18px;text-anchor:middle}.small{font-size:15px;fill:#778193}.box{fill:#fff;stroke:#d9dee7;stroke-width:1.5}.yellow{fill:#fffae5;stroke:#dfbf48;stroke-width:1.5}.arrow{fill:none;stroke:#8c94a2;stroke-width:1.6;marker-end:url(#arrow)}</style></defs>
+<rect width="1400" height="1180" rx="18" fill="#fafbfd"/>
+<text x="700" y="54" style="font-size:28px;font-weight:600">BenchSquare · 公开排行榜流程</text><text class="small" x="700" y="85">v1.0 · 2026-10-29 · 演示成绩与真实审核记录隔离</text>
+<rect class="yellow" x="480" y="120" width="440" height="62" rx="31"/><text x="700" y="158">比赛详情 → 排行榜标签</text>
+<path class="arrow" d="M700 182V220"/>
+<rect class="box" x="480" y="220" width="440" height="78" rx="10"/><text x="700" y="251">读取当前比赛、账号与团队身份</text><text class="small" x="700" y="278">示例赛事加载固定成绩；新建比赛保持空榜</text>
+<path class="arrow" d="M700 298V337"/>
+<rect class="box" x="480" y="337" width="440" height="78" rx="10"/><text x="700" y="368">上榜资格：至少 3 道验收且已评分任务</text><text class="small" x="700" y="395">待审核和未通过任务不计入</text>
+<path class="arrow" d="M700 415V449"/>
+<path class="yellow" d="M700 449L852 510L700 571L548 510Z"/><text x="700" y="516">有上榜团队？</text>
+<path class="arrow" d="M548 510H310"/><text class="small" x="426" y="496">否</text>
+<rect class="box" x="70" y="471" width="240" height="90" rx="10"/><text x="190" y="507">成绩尚未公布</text><text class="small" x="190" y="535">说明上榜条件，隐藏分页</text>
+<path class="arrow" d="M700 571V610"/><text class="small" x="724" y="596">是</text>
+<rect class="box" x="480" y="610" width="440" height="88" rx="10"/><text x="700" y="642">综合分降序 → 同分并列 → 稳定展示</text><text class="small" x="700" y="670">最高 3 道平均分 · 两位小数 · 1、2、2、4</text>
+<path class="arrow" d="M700 698V738"/>
+<rect class="box" x="480" y="738" width="440" height="88" rx="10"/><text x="700" y="770">搜索团队 / 仅看我的团队</text><text class="small" x="700" y="798">可叠加筛选 · 保留全榜名次 · 重置为第 1 页</text>
+<path class="arrow" d="M480 782H310"/>
+<rect class="box" x="70" y="737" width="240" height="100" rx="10"/><text x="190" y="772">筛选无结果</text><text class="small" x="190" y="801">说明原因，提供清除筛选</text>
+<path class="arrow" d="M700 826V865"/>
+<rect class="yellow" x="480" y="865" width="440" height="88" rx="10"/><text x="700" y="897">展示榜单，每页 10 支团队</text><text class="small" x="700" y="925">本人团队浅黄高亮 · 分页不改变原始排名</text>
+<path class="arrow" d="M920 909H1070V298H920"/>
+<rect class="box" x="995" y="500" width="330" height="100" rx="10"/><text x="1160" y="535">点击「更新」重新读取榜单</text><text class="small" x="1160" y="565">保留筛选与页码，刷新更新时间</text>
+<path class="arrow" d="M700 953V997"/>
+<rect class="box" x="480" y="997" width="440" height="66" rx="10"/><text x="700" y="1036">最终获奖资格与奖金另行公示</text>
+<rect x="65" y="1100" width="1270" height="47" rx="8" fill="#f0f2f6"/><text class="small" x="700" y="1129">演示场景：已有成绩 / 我的团队暂无成绩 / 全场暂无成绩 ｜ 不提供下载 ｜ 不随机改变成绩</text>
+</svg>
