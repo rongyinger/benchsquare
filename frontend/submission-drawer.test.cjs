@@ -56,7 +56,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     await page.locator('.submission-drawer').waitFor({state:'detached'});
     await page.goto(base+'#mine');
     assert.equal(await page.locator('[data-submit-data]').count(),0);
-    await page.locator('a[href="#competition/workbench-demo"]').click();
+    await page.locator('.mine-card-heading a[href="#competition/workbench-demo"]').click();
     await page.locator('.detail-heading [data-submit-data]').click();await page.locator('[data-dd-new]').click();await frame().locator('#f-name').waitFor();
     await page.frames().find(f=>f.url().includes('embed=1')).evaluate(()=>document.fonts.ready);
     await page.screenshot({path:'deliverables/submission-drawer-desktop.png',animations:'disabled'});
