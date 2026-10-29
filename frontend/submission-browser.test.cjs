@@ -20,14 +20,14 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     await page.screenshot({path:path.join(__dirname,'submission-desktop-preview.png'),fullPage:true});
     await page.locator('[data-category="input"]').evaluate(el=>{const dt=new DataTransfer();const large=new File(['x'],'too-large.bin');Object.defineProperty(large,'size',{value:50*1024**3+1});dt.items.add(large);el.dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:dt}));});
     assert.equal(await page.locator('.file-list li').count(),3);assert.ok((await page.locator('#notice').innerText()).includes('超过 50 GB'));
-    for(const [category,name]of [['input','input.txt'],['evidence','starter.txt'],['reference','secret.txt']])await page.locator(`[data-upload="${category}"]`).setInputFiles(file(name,category));
+    for(const [category,name]of [['input','input.txt'],['input','starter.txt'],['reference','secret.txt']])await page.locator(`[data-upload="${category}"]`).setInputFiles(file(name,category));
     assert.equal(await page.locator('.file-list li').count(),6);
     await page.locator('[data-remove="sample-input"]').click();assert.equal(await page.locator('.file-list li').count(),5);
     // Exercise actual drop event and a multi-file selection without reading source task files.
     await page.locator('[data-category="input"]').evaluate(el=>{const dt=new DataTransfer();dt.items.add(new File(['drop'],'drag.txt',{type:'text/plain'}));el.dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:dt}));});
-    await page.locator('[data-upload="evidence"]').setInputFiles([file('a.txt','a'),file('b.txt','b')]);
+    await page.locator('[data-upload="reference"]').setInputFiles([file('a.txt','a'),file('b.txt','b')]);
     assert.equal(await page.locator('.file-list li').count(),8);
-    await page.locator('#f-model').fill('私有标记 SHOULD_STAY_PRIVATE');
+    await page.locator('#f-cloudLink').fill('https://drive.google.com/file/d/SHOULD_STAY_PRIVATE/view');
     await page.locator('#f-verification').fill('# 100 分\n- **正确性：100 分**\n<img src=x onerror="window.xss=1">');await click('md-preview');assert.equal(await page.locator('#markdown-preview img').count(),0);assert.ok((await page.locator('#markdown-preview').innerText()).includes('<img'));await click('md-edit');
     await click('preview');assert.equal(await page.locator('#preview-content .preview-section').first().getByText('私有标记 SHOULD_STAY_PRIVATE').count(),0);assert.ok((await page.locator('#preview-content .private-section').innerText()).includes('secret.txt'));assert.equal(await page.locator('#preview-content .preview-section').first().getByText('secret.txt').count(),0);await page.locator('#close-preview').click();
     await click('save');await page.reload();assert.ok((await page.locator('.warning').innerText()).includes('重新选择'));await page.locator('#f-consent').check();await page.locator('#f-terms').check();await click('submit');assert.ok((await page.locator('#err-attachments').innerText()).includes('部分附件'));

@@ -11,7 +11,7 @@ assert.equal(D.filter(mine,{competition:'code',stage:'已审核',search:'depende
 assert.equal(D.filter(mine,{competition:'unbound'}).length,1);
 const adopted=mine.at(-1),snapshot=JSON.stringify(adopted.history);adopted.draftForm={...adopted.form,description:'changed'};
 assert.equal(D.status(adopted),'已录用');assert.equal(D.locked(adopted),true);assert.equal(D.form(adopted),adopted.form);assert.ok(!D.drafts([adopted],adopted.competitionId).length);assert.equal(JSON.stringify(adopted.history),snapshot);assert.equal(adopted.reviews.length,2);
-assert.equal(JSON.parse(mine[0].form.attachments[2].content).mock,true);assert.ok(mine[0].form.attachments[0].content.includes('\nid,value\n'));
+assert.deepEqual(mine[0].form.attachments.map(a=>a.category),['input','reference']);assert.ok(!('model' in mine[0].form));assert.ok(mine[0].form.attachments[0].content.includes('\nid,value\n'));
 for(const status of ['待初审','终检中','已审核','已通过','需修改','未通过']){
  const legacy={...M.generate('rong')[3],competitionId:undefined,status};
  const before=JSON.stringify(legacy);
