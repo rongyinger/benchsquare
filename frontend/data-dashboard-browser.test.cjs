@@ -12,9 +12,10 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
  await p.goto(base+'#data-dashboard');await p.getByRole('button',{name:'查看示例',exact:true}).click();
  assert.deepEqual(await p.locator('.dd-metric strong').allTextContents(),['3','3','3','3']);
  await p.getByRole('button',{name:'查看示例',exact:true}).click();assert.equal((await read()).records.length,12);
- await p.getByRole('button',{name:'按状态',exact:true}).click();assert.equal(await p.locator('.dd-column').count(),4);
- await p.locator('#dd-search').fill('dependency_conflict');assert.equal(await p.locator('.dd-task-card').count(),1);assert.deepEqual(await p.locator('.dd-metric strong').allTextContents(),['3','3','3','3']);
- await p.getByRole('button',{name:'清除筛选',exact:true}).click();await p.getByRole('button',{name:'按比赛',exact:true}).click();
+ assert.equal(await p.getByRole('button',{name:'按状态',exact:true}).count(),0);assert.equal(await p.locator('.dd-table tbody tr').count(),12);
+ await p.locator('#dd-search').fill('dependency_conflict');assert.equal(await p.locator('.dd-table tbody tr').count(),1);assert.deepEqual(await p.locator('.dd-metric strong').allTextContents(),['3','3','3','3']);
+ await p.getByRole('button',{name:'清除筛选',exact:true}).click();
+ await p.locator('#dd-stage').selectOption('审核中');assert.equal(await p.locator('.dd-table tbody tr').count(),3);await p.getByRole('button',{name:'清除筛选',exact:true}).click();
  for(const lockedName of ['thermal_boundary_accepted_03','api_retry_review_01','material_strength_qualified_03','chart_units_rejected_02']){
  const locked=(await read()).records.find(r=>r.form.name===lockedName),lockedSnapshot=JSON.stringify(locked);
  assert.equal(await p.locator('.dd-table th').filter({hasText:'提交版本'}).count()>0,true);
