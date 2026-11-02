@@ -18,7 +18,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     assert.equal(await page.getByText('进入参赛工作台',{exact:false}).count(),0);
     await frame().locator('#f-name').fill('侧边栏草稿');
     await page.getByRole('button',{name:'关闭提交面板'}).click();
-    assert.equal(await page.locator('.submission-drawer').count(),1,'cancel close keeps changes');
+    await page.getByRole('dialog',{name:'是否保存修改？'}).waitFor();await page.getByRole('button',{name:'继续编辑',exact:true}).click();assert.equal(await page.locator('.submission-drawer').count(),1,'cancel close keeps changes');
     await frame().locator('[data-do="save"]').click();
     assert.equal((await read()).records[0].status,'草稿');
     await page.getByRole('button',{name:'关闭提交面板'}).click();

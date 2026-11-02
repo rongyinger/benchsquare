@@ -1,0 +1,11 @@
+.unsaved-dialog{box-sizing:border-box;position:fixed;inset:0;margin:auto;width:460px;max-width:calc(100vw - 48px);height:fit-content;max-height:90vh;padding:28px;border:1px solid #e6e8ed;border-radius:16px;background:#fff;color:#121826;box-shadow:0 20px 70px #12172233;font-family:inherit}
+.unsaved-dialog::backdrop{background:rgba(18,23,34,.38)}
+.unsaved-dialog h2{margin:0 0 12px;font-size:20px;line-height:1.5}
+.unsaved-dialog p{margin:0;color:#788191;font-size:14px;line-height:1.8}
+.unsaved-dialog .unsaved-error{margin-top:12px;color:#b23838}
+.unsaved-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:28px}
+.unsaved-actions button{padding:10px 14px;border:1px solid #dfe3e9;border-radius:8px;background:#fff;color:#343a46;cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
+.unsaved-actions [data-unsaved="save"]{background:#f1cf4b;border-color:#e6c344;color:#30290c;font-weight:600}
+.unsaved-actions button:focus-visible{outline:3px solid #d9ae26;outline-offset:3px}
+.unsaved-actions button:disabled{opacity:.6;cursor:wait}
+.unsaved-dialog [hidden]{display:none!important}
