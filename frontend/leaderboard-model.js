@@ -6,11 +6,11 @@
     sorted.forEach((t,i)=>{t.rank=i&&t.score===sorted[i-1].score?sorted[i-1].rank:i+1;});
     return sorted;
   }
-  function select(teams,{query='',mine=false,teamId='',page=1,size=10}={}){
+  function select(teams,{query='',mine=false,teamId='',expanded=false}={}){
     const ranked=rank(teams),needle=query.trim().toLocaleLowerCase();
     const filtered=ranked.filter(t=>(!needle||t.name.toLocaleLowerCase().includes(needle))&&(!mine||t.id===teamId));
-    const pages=Math.max(1,Math.ceil(filtered.length/size)),current=Math.max(1,Math.min(page,pages));
-    return {rows:filtered.slice((current-1)*size,current*size),total:filtered.length,ranked,page:current,pages};
+    const filtering=!!needle||mine,remaining=filtered.filter(t=>t.rank>10).length;
+    return {rows:filtering||expanded?filtered:filtered.filter(t=>t.rank<=10),total:filtered.length,ranked,remaining:filtering?0:remaining,expanded:!filtering&&expanded&&remaining>0,filtering};
   }
   function fixtures(cid,ownTeam){
     const names=['数据探索者','知行研究队','精确标注组','山海数据社','星河实验室','长尾探索队','向量空间','多维观察组','青禾共创队','逐光研究组','零一数据队','北辰实验室','答案有据队','远山协作组','拾贝数据社','知微工作组','格物共创队','清晰边界队','复现研究社','新知探索队'];
