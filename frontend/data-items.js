@@ -12,5 +12,12 @@
   }
   function drafts(records,cid){return records.filter(r=>status(r)==='草稿'&&(!r.competitionId||r.competitionId===cid));}
   function result(r){const s=status(r);if(!r.competitionId)return '未关联比赛 · 关联后可提交';if(s==='草稿')return r.revision?'修改草稿 · 原提交与审核记录保留':'尚未提交';if(s==='审核中')return r.status==='终检中'?'初审通过 · 终检中':'已提交，审核中';return r.reviewOutcome||({'已通过':'已录用','需修改':'需补正','未通过':'审核不通过'})[r.status]||'审核通过 · 待录用';}
-  const api={key,statuses,owner,status,locked,form,read,list,filter,drafts,result};if(typeof module!=='undefined')module.exports=api;else root.DataItems=api;
+  const label=r=>(typeof r==='string'?r:status(r))==='已审核'?'审核结果':(typeof r==='string'?r:status(r));
+  function reviewInfo(r){
+    const current=(r.reviews||[]).filter(h=>h.revision===r.revision).at(-1);
+    const legacy=!(r.reviews||[]).length&&r.competitionId&&['已审核','需修改','未通过','已通过','已录用'].includes(r.status);
+    const correction=!!r.competitionId&&!locked(r)&&(current?.to==='需修改'||(!current&&legacy&&(r.status==='需修改'||r.reviewOutcome==='需补正')));
+    return {current,correction,note:current?.note||(legacy?r.reviewNote||'':''),outcome:correction?'需补正':result(r)};
+  }
+  const api={key,statuses,owner,status,label,reviewInfo,locked,form,read,list,filter,drafts,result};if(typeof module!=='undefined')module.exports=api;else root.DataItems=api;
 })(typeof window==='undefined'?globalThis:window);

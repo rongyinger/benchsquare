@@ -14,7 +14,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   const close=()=>page.getByRole('button',{name:'关闭提交面板'}).click();
   const modal=()=>page.getByRole('dialog',{name:'是否保存修改？'});
   const read=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('benchsquare-submissions-v1')));
-  const open=async()=>{await page.locator('[data-data="edit"]').first().click();await frame().locator('#f-name').waitFor();};
+  const open=async()=>{await page.locator('.dd-text-button[data-data="detail"]').first().click();await frame().locator('[data-do^="edit:"]').click();await frame().locator('#f-name').waitFor();};
   await page.goto(base+'#data-dashboard');
   await page.locator('[data-data="new"]').first().click();await frame().locator('#f-name').fill('保存前的草稿');
   await close();await modal().waitFor();

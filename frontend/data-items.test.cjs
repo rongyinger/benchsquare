@@ -30,3 +30,5 @@ for(const stage of ['待初审','终检中','已提交','待质检','已审核',
 for(const record of [M.generate('rong')[0],M.generate('rong')[2],M.generate('rong')[6]])assert.equal(D.locked(record),false,'draft and explicit revision request stay editable');
 const resubmitted=M.generate('rong')[5];assert.equal(resubmitted.reviews.at(-1).to,'需修改');assert.equal(D.locked(resubmitted),true,'feedback on an older revision must not unlock a submission under review');
 console.log('Data items passed: ownership, four states, stable examples, draft eligibility, combined filters and frozen review history.');
+
+assert.equal(D.label('已审核'),'审核结果');assert.equal(D.label(M.generate('rong')[6]),'审核结果');assert.equal(D.reviewInfo(M.generate('rong')[6]).correction,true);assert.equal(D.reviewInfo(M.generate('rong')[5]).note,'');assert.equal(D.reviewInfo(M.generate('rong')[5]).correction,false);assert.equal(D.reviewInfo(M.generate('rong')[7]).correction,false);

@@ -5,7 +5,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
  const browser=await chromium.launch({headless:true,channel:'chrome'});
  try{
   const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
-  const base='http://127.0.0.1:4173/frontend/';
+  const base=process.env.DEMO_BASE||'http://127.0.0.1:4173/frontend/';
   const read=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('benchsquare-submissions-v1')));
   const click=a=>page.locator('[data-do="'+a+'"]').click();
   const review=async(id,action,note='')=>{if(!await page.locator('#review-note').isVisible())await page.locator('.review-simulator summary').click();if(note)await page.locator('#review-note').fill(note);await click('review:'+id+':'+action);};
