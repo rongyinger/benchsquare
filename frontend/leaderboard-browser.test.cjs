@@ -11,6 +11,8 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     await page.getByRole('tab',{name:'排行榜',exact:true}).click();
     await page.locator('.lb-table').waitFor();
     assert.equal(await page.locator('.lb-table tbody tr').count(),10);
+    assert.equal(await page.locator('.lb-table tbody tr').nth(0).locator('.lb-number').last().innerText(),'1');
+    assert.equal(await page.locator('.lb-table tbody tr').nth(1).locator('.lb-number').last().innerText(),'2');
     assert.deepEqual(await page.locator('.lb-rank').allTextContents(),['1','2','2','4','5','6','7','8','9','10']);
     assert.equal(await page.locator('.lb-mine').count(),1);
     assert.equal(await page.locator('.detail-aside').isVisible(),false);

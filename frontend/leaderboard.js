@@ -9,6 +9,11 @@
   // Creator-authored rules and unrelated saved fields remain their original values.
   let migrated=false;
   for(const c of state.competitions){
+    if(c.mineStatusExample&&c.values?.rankRule){
+      const oldRule=c.values.rankRule;
+      c.values.rankRule=c.values.rankRule.replace('团队成绩取验收通过且已评分的得分最高3道任务的平均分，保留两位小数；不足3道不参与排名。','至少1道任务验收通过且完成评分即可上榜。团队成绩取有效任务中得分最高的至多3道平均分，只有1道取该道分数，只有2道取两道平均，保留两位小数。').replace('团队成绩取验收通过的得分最高3道任务的平均分；不足3道不参与排名。','至少1道任务验收通过且完成评分即可上榜。团队成绩取有效任务中得分最高的至多3道平均分，只有1道取该道分数，只有2道取两道平均，保留两位小数。');
+      if(c.values.rankRule!==oldRule)migrated=true;
+    }
     const oldTie='并列时依次比较准确性、推理与依据得分，仍相同则由评审组复核。';
     if(c.mineStatusExample&&c.values?.rankRule?.includes(oldTie)){
       c.values.rankRule=c.values.rankRule.replace(oldTie,'同分显示并列名次（如1、2、2、4），同分团队按达到该分数的时间先后展示，时间不用于打破并列。榜单不自动决定获奖资格，并列获奖与奖金分配由评审组确认后另行公示。');migrated=true;
@@ -21,7 +26,7 @@
   function result(c){
     const v=view(c),t=own(c),d=data(c);v.page=d.page;
     let hint='';
-    if(t&&!d.ranked.some(r=>r.id===t.id))hint=`<div class="lb-own-notice"><strong>${esc(t.name)} · 我的团队暂无成绩</strong><span>至少 3 道任务通过验收并完成评分后上榜，待审核及未通过提交不计分。</span></div>`;
+    if(t&&!d.ranked.some(r=>r.id===t.id))hint=`<div class="lb-own-notice"><strong>${esc(t.name)} · 我的团队暂无成绩</strong><span>至少 1 道任务通过验收并完成评分即可上榜，待审核及未通过提交不计分。</span></div>`;
     let body;
     if(!d.ranked.length)body='<div class="lb-empty"><span class="lb-empty-icon">'+icon('cup')+'</span><h3>成绩尚未公布</h3><p>任务通过验收并完成评分后，符合条件的团队将在这里上榜。</p><small>榜单成绩不代表最终获奖结果，以赛事公示为准。</small></div>';
     else if(!d.total)body='<div class="lb-empty">'+icon('search')+'<h3>'+(v.mine?'我的团队暂无上榜成绩':'没有找到匹配的团队')+'</h3><p>'+(v.mine?'通过验收并完成评分后，可在此查看团队排名。':'试试其他团队名称，或清除筛选条件。')+'</p><button class="button" data-lb="clear">清除筛选</button></div>';
@@ -30,7 +35,7 @@
   }
   function content(c){
     const v=view(c),t=own(c);if(!v.updatedAt)v.updatedAt=Date.now();
-    return `<section class="leaderboard" aria-labelledby="lb-title"><header class="lb-heading"><div><div class="lb-kicker">COMPETITION LEADERBOARD</div><h2 id="lb-title">公开排行榜 ${isDemo(c)?'<span class="lb-demo-badge">演示数据</span>':''}</h2><p>让每一份高质量贡献，都有迹可循。</p></div><button class="button lb-refresh" data-lb="refresh" aria-label="更新排行榜"><span aria-hidden="true">↻</span> 更新</button></header><div class="lb-controls"><label class="lb-search">${icon('search')}<input type="search" id="lb-search" placeholder="搜索团队名称" aria-label="搜索排行榜团队" value="${esc(v.query)}"></label><label class="lb-only-mine"><input type="checkbox" id="lb-only-mine" ${v.mine?'checked':''} ${t?'':'disabled'}>仅看我的团队</label></div><p class="lb-rule">按验收通过且已评分的最高 3 道任务平均分排名，分数越高越好；不足 3 道不上榜。同分并列，按达到该分数的时间展示。</p>${isDemo(c)?`<div class="lb-demo-controls"><label for="lb-scenario">演示场景</label><select id="lb-scenario"><option value="scores" ${v.scenario==='scores'?'selected':''}>已有成绩</option><option value="unscored" ${v.scenario==='unscored'?'selected':''}>我的团队暂无成绩</option><option value="empty" ${v.scenario==='empty'?'selected':''}>全场暂无成绩</option></select><span>模拟成绩仅用于展示，不关联真实审核结果。</span></div>`:''}<div id="lb-results" aria-live="polite">${result(c)}</div><p class="lb-footnote">公开榜单供参赛进度参考，最终获奖名单以赛事公示为准。${!t?'报名并完成组队后，可查看我的团队成绩。':''}</p></section>`;
+    return `<section class="leaderboard" aria-labelledby="lb-title"><header class="lb-heading"><div><div class="lb-kicker">COMPETITION LEADERBOARD</div><h2 id="lb-title">公开排行榜 ${isDemo(c)?'<span class="lb-demo-badge">演示数据</span>':''}</h2><p>让每一份高质量贡献，都有迹可循。</p></div><button class="button lb-refresh" data-lb="refresh" aria-label="更新排行榜"><span aria-hidden="true">↻</span> 更新</button></header><div class="lb-controls"><label class="lb-search">${icon('search')}<input type="search" id="lb-search" placeholder="搜索团队名称" aria-label="搜索排行榜团队" value="${esc(v.query)}"></label><label class="lb-only-mine"><input type="checkbox" id="lb-only-mine" ${v.mine?'checked':''} ${t?'':'disabled'}>仅看我的团队</label></div><p class="lb-rule">至少 1 道任务验收通过且完成评分即可上榜。按最高至多 3 道有效任务的平均分排名，不足 3 道按实际数量计算，分数越高越好。同分并列，按达到该分数的时间展示。</p>${isDemo(c)?`<div class="lb-demo-controls"><label for="lb-scenario">演示场景</label><select id="lb-scenario"><option value="scores" ${v.scenario==='scores'?'selected':''}>已有成绩</option><option value="unscored" ${v.scenario==='unscored'?'selected':''}>我的团队暂无成绩</option><option value="empty" ${v.scenario==='empty'?'selected':''}>全场暂无成绩</option></select><span>模拟成绩仅用于展示，不关联真实审核结果。</span></div>`:''}<div id="lb-results" aria-live="polite">${result(c)}</div><p class="lb-footnote">公开榜单供参赛进度参考，最终获奖名单以赛事公示为准。${!t?'报名并完成组队后，可查看我的团队成绩。':''}</p></section>`;
   }
   detailContent=function(c){return detailTab==='排行榜'?content(c):oldContent(c);};
   details=function(c){const html=oldDetails(c);return detailTab==='排行榜'?html.replace('class="detail-grid"','class="detail-grid lb-full-width"'):html;};
