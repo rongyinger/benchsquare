@@ -32,3 +32,5 @@ const resubmitted=M.generate('rong')[5];assert.equal(resubmitted.reviews.at(-1).
 console.log('Data items passed: ownership, four states, stable examples, draft eligibility, combined filters and frozen review history.');
 
 assert.equal(D.label('已审核'),'审核结果');assert.equal(D.label(M.generate('rong')[6]),'审核结果');assert.equal(D.reviewInfo(M.generate('rong')[6]).correction,true);assert.equal(D.reviewInfo(M.generate('rong')[5]).note,'');assert.equal(D.reviewInfo(M.generate('rong')[5]).correction,false);assert.equal(D.reviewInfo(M.generate('rong')[7]).correction,false);
+
+assert.equal(D.reviewLabel(M.generate('rong')[6]),'已审核 · 需补正');assert.equal(D.reviewLabel(M.generate('rong')[7]),'已审核 · 审核不通过');assert.equal(D.reviewLabel(M.generate('rong')[8]),'已审核 · 审核通过');

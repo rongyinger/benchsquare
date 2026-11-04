@@ -19,5 +19,6 @@
     const correction=!!r.competitionId&&!locked(r)&&(current?.to==='需修改'||(!current&&legacy&&(r.status==='需修改'||r.reviewOutcome==='需补正')));
     return {current,correction,note:current?.note||(legacy?r.reviewNote||'':''),outcome:correction?'需补正':result(r)};
   }
-  const api={key,statuses,owner,status,label,reviewInfo,locked,form,read,list,filter,drafts,result};if(typeof module!=='undefined')module.exports=api;else root.DataItems=api;
+  const reviewLabel=r=>'已审核 · '+reviewInfo(r).outcome.split(' · ')[0];
+  const api={key,statuses,owner,status,label,reviewInfo,reviewLabel,locked,form,read,list,filter,drafts,result};if(typeof module!=='undefined')module.exports=api;else root.DataItems=api;
 })(typeof window==='undefined'?globalThis:window);
