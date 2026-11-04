@@ -1,0 +1,7 @@
+.detail-grid:has(.team-contributions)>.prose{min-width:0}
+.team-contributions{max-width:100%;min-width:0}
+.team-contributions .table-wrap{max-width:100%;overflow-x:auto;margin:12px 0}
+.team-contributions .data-table{min-width:540px}
+.team-contributions .data-table th:first-child{width:36%}
+.team-contributions .data-table td:first-child{white-space:nowrap}
+.team-contributions .data-table td:not(:first-child),.team-contributions .data-table th:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}

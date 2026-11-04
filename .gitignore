@@ -13,6 +13,7 @@
 !/docs/architecture/roboto-regular.ttf
 !/docs/leaderboard/
 !/docs/submission/
+!/docs/team-contributions/
 
 node_modules/
 *.log
