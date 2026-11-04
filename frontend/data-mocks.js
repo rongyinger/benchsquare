@@ -13,8 +13,10 @@
     const at=new Date(Date.UTC(2026,9,15+i,2,30)).toISOString(),revision=[2,5,11].includes(i)?(i===2?1:2):status==='草稿'?0:1;
     const review=(v,note,to)=>({revision:v,from:'待初审',to,note,at,by:'演示评审员',simulated:true});
     const reviews=[];if(i===2||i===5||i===11)reviews.push(review(1,'请补充边界条件及单位换算依据。','需修改'));if(i>=6&&i!==11)reviews.push(review(revision,i===6?'依赖版本与复现命令缺失，请补充最小复现和回归测试。':i===7?'图表单位换算错误，缺失值处理没有说明。':'任务与验证标准完整，'+(i===8?'审核通过，等待赛事确认录用。':'已确认录用该版本。'),i===6?'需修改':i===7?'未通过':i===8?'已审核':'已通过'));if(i===11)reviews.push(review(2,'补正内容完整，已确认 v2 录用；v1 意见保留。','已通过'));
+    if(i>=8){const latest=reviews.at(-1);latest.score=({8:87.5,9:91.25,10:89,11:94.75})[i];}
     const r={id:'personal-demo-'+user+'-'+i,ownerId:user,updatedBy:user,competitionId:cid||undefined,teamId:cid?'mock-team-'+cid+'-'+user:undefined,form,status,reviewOutcome:outcome,mock:true,createdAt:at,updatedAt:at,revision,number:revision?'BS-DEMO-'+String(i+1).padStart(3,'0'):undefined,history:Array.from({length:revision},(_,n)=>({revision:n+1,number:'BS-DEMO-'+String(i+1).padStart(3,'0'),at,by:user,name,form:JSON.parse(JSON.stringify({...form,verification:n===0&&revision===2?'首版验证标准（历史示例）':form.verification}))})),reviews,reviewNote:reviews.at(-1)?.note||''};
     if(i===2){r.status='需修改';r.draftForm=JSON.parse(JSON.stringify(form));}return r;
   });}
-  const api={generate};if(typeof module!=='undefined')module.exports=api;else root.DataMocks=api;
+  function upgradeScores(store,user){const seeds=new Map(generate(user).map(r=>[r.id,r]));let changed=false;for(const r of store.records){const seed=r.mock&&seeds.get(r.id);if(!seed)continue;for(const h of r.reviews||[]){const original=seed.reviews.find(v=>v.revision===h.revision&&v.to===h.to&&v.at===h.at&&v.note===h.note);if(h.score===undefined&&original?.score!==undefined){h.score=original.score;changed=true;}}}return changed;}
+  const api={generate,upgradeScores};if(typeof module!=='undefined')module.exports=api;else root.DataMocks=api;
 })(typeof window==='undefined'?globalThis:window);
