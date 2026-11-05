@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict'),M=require('./team-contributions-model.js');
+const team={id:'t',cid:'c',members:['leader','member'],leader:'leader'};
+const record=(id,ownerId,status,extra={})=>({id,ownerId,status,competitionId:'c',teamId:'t',...extra});
+const records=[record('a','leader','已通过',{revision:2,history:[{by:'leader'},{by:'leader'}]}),record('b','member','待初审'),record('c','member','需修改',{draftForm:{secret:'private'}}),record('d','member','草稿'),record('e','member','已录用',{teamId:'other'}),record('f','member','已通过',{competitionId:'other'}),record('g','member','已通过',{mock:true}),record('h',undefined,'已通过'),record('i',undefined,'终检中',{history:[{by:'member'}]}),record('j','former','已通过'),record('a','leader','已通过')];
+assert.deepEqual(M.summarize(records,team,'leader'),[{id:'leader',submitted:1,accepted:1,pending:0},{id:'member',submitted:3,accepted:0,pending:2}]);
+assert.deepEqual(M.summarize(records,team,'member'),M.summarize(records,team,'leader'));
+assert.equal(M.summarize(records,team,'outsider'),null);
+assert.deepEqual(M.summarize([],team,'member').map(r=>r.submitted),[0,0]);
+assert.equal(JSON.stringify(M.summarize(records,team,'member')).includes('private'),false);
+console.log('Team contributions: membership, competition/team isolation, deduplication, revisions, draft/mock exclusion and counts-only projection passed.');
