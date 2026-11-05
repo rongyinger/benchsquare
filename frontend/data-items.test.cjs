@@ -10,8 +10,8 @@ assert.ok(D.drafts(mine,'code').some(r=>!r.competitionId));
 assert.equal(D.filter(mine,{competition:'code',stage:'已审核',search:'dependency'}).length,1);
 assert.equal(D.filter(mine,{competition:'unbound'}).length,1);
 const adopted=mine.at(-1),snapshot=JSON.stringify(adopted.history);adopted.draftForm={...adopted.form,description:'changed'};
-assert.equal(D.status(adopted),'已录用');assert.equal(D.locked(adopted),true);assert.equal(D.form(adopted),adopted.form);assert.ok(!D.drafts([adopted],adopted.competitionId).length);assert.equal(JSON.stringify(adopted.history),snapshot);assert.equal(adopted.reviews.length,2);
-assert.deepEqual(mine[0].form.attachments.map(a=>a.category),['input','reference']);assert.ok(!('model' in mine[0].form));assert.ok(mine[0].form.attachments[0].content.includes('\nid,value\n'));
+assert.equal(D.status(adopted),'已录用');assert.equal(D.locked(adopted),true);assert.equal(D.form(adopted),adopted.form);assert.ok(!D.drafts([adopted],adopted.competitionId).length);assert.equal(JSON.stringify(adopted.history),snapshot);assert.equal(adopted.reviews.length,3);
+assert.deepEqual(mine[0].form.attachments.map(a=>a.category),['harbor']);assert.ok(!('model' in mine[0].form));assert.equal(mine[0].form.attachments[0].archive,true);assert.equal(mine[0].form.submissionFormat,'harbor');
 for(const status of ['待初审','终检中','已审核','已通过','需修改','未通过']){
  const legacy={...M.generate('rong')[3],competitionId:undefined,status};
  const before=JSON.stringify(legacy);
@@ -35,6 +35,31 @@ assert.equal(D.label('已审核'),'审核结果');assert.equal(D.label(M.generat
 
 assert.equal(D.reviewLabel(M.generate('rong')[6]),'已审核 · 需补正');assert.equal(D.reviewLabel(M.generate('rong')[7]),'已审核 · 审核不通过');assert.equal(D.reviewLabel(M.generate('rong')[8]),'已审核 · 审核通过');
 
+const oldExample={...mine[6],form:{name:'legacy-example',description:'old fields',attachments:[]},history:[{revision:1,form:{name:'legacy-example',description:'old snapshot',attachments:[]}}]};
+const upgraded=M.upgrade({records:[oldExample]});assert.equal(upgraded.records[0].form.submissionFormat,'harbor');assert.equal(upgraded.records[0].history[0].form.attachments.length,1);assert.deepEqual(upgraded.records[0].reviews,oldExample.reviews);assert.equal(oldExample.form.description,'old fields');
+
+for(const r of M.generate('rong')){
+ const timeline=D.timeline(r);
+ for(const version of timeline){
+  assert.ok(version.reviews.every(review=>review.revision===version.revision));
+  for(const review of version.reviews)assert.ok(review.at>version.at,'reviews follow their submission');
+ }
+ if(r.revision===2){
+  assert.notEqual(r.history[0].form.attachments[0].name,r.history[1].form.attachments[0].name);
+  assert.notEqual(r.history[0].form.attachments[0].archivePath,r.history[1].form.attachments[0].archivePath);
+  assert.ok(r.history[0].at<r.history[1].at);
+  assert.equal(r.form.attachments[0].id,r.history[1].form.attachments[0].id);
+ }
+}
+const twice=M.generate('rong')[11],rounds=D.timeline(twice);assert.deepEqual(rounds.map(h=>h.revision),[2,1]);assert.equal(rounds[0].reviews.length,2);assert.equal(rounds[1].reviews[0].to,'需修改');
+const pending=D.timeline(M.generate('rong')[5]);assert.equal(pending[0].reviews.length,0);assert.equal(pending[1].reviews[0].to,'需修改');
+const sparse={revision:2,form:{name:'current'},createdAt:'2026-10-01',history:[{revision:1,form:{name:'original'}}],reviews:[{revision:1,note:'old'}]};assert.equal(D.timeline(sparse)[0].form.name,'current');assert.equal(D.timeline(sparse)[0].reviews.length,0);assert.equal(D.timeline(sparse)[1].form.name,'original');
+const oldBundled={...M.generate('rong')[11],mockVersion:undefined};assert.equal(M.upgrade({records:[oldBundled]}).records[0].mockVersion,M.version);
+const edited={...oldBundled,form:{...oldBundled.form,attachments:[{id:'actual',source:'file',category:'harbor',name:'mine.zip'}]}};assert.equal(M.upgrade({records:[edited]}).records[0],edited,'participant edits must not be replaced');
 assert.equal(D.reviewInfo(M.generate('rong')[8]).score,87.5);assert.equal(D.reviewInfo(M.generate('rong')[7]).passed,false);assert.equal(D.reviewInfo(M.generate('rong')[7]).score,null);assert.equal(D.reviewInfo(M.generate('rong')[5]).score,null);for(const value of [undefined,null,'87.5',-1,NaN,Infinity])assert.equal(D.validScore(value),false);assert.equal(D.validScore(0),true);const zero=M.generate('rong')[8];zero.reviews.at(-1).score=0;assert.equal(D.reviewInfo(zero).score,0);const old=M.generate('rong')[8];old.revision=2;assert.equal(D.reviewInfo(old).score,null);const legacyScores={records:M.generate('rong')};delete legacyScores.records[8].reviews[0].score;assert.equal(M.upgradeScores(legacyScores,'rong'),true);assert.equal(legacyScores.records[8].reviews[0].score,87.5);assert.equal(M.upgradeScores(legacyScores,'rong'),false);const actual={...M.generate('rong')[8],mock:false};delete actual.reviews[0].score;assert.equal(M.upgradeScores({records:[actual]},'rong'),false);assert.equal(actual.reviews[0].score,undefined);
 
 const repeated=M.generate('rong')[7];assert.equal(repeated.revision,2);assert.deepEqual(repeated.reviews.map(h=>h.to),['未通过','未通过']);assert.equal(repeated.history.length,2);assert.equal(D.reviewInfo(repeated).note,repeated.reviews[1].note);assert.equal(D.locked(repeated),true);const cached=structuredClone(repeated);cached.revision=1;cached.updatedAt=cached.reviews[0].at;cached.reviewNote=cached.reviews[0].note;cached.reviews=cached.reviews.slice(0,1);cached.history=cached.history.slice(0,1);cached.form=Object.fromEntries(Object.entries(cached.form).reverse());const originalForm=JSON.stringify(cached.form);const originalReview=JSON.stringify(cached.reviews[0]),originalSnapshot=JSON.stringify(cached.history[0]);assert.equal(M.upgradeReviewExample({records:[cached]},'rong'),true);assert.equal(cached.revision,2);assert.equal(JSON.stringify(cached.form),originalForm);assert.equal(JSON.stringify(cached.reviews[0]),originalReview);assert.equal(JSON.stringify(cached.history[0]),originalSnapshot);assert.equal(M.upgradeReviewExample({records:[cached]},'rong'),false);const editedCached=structuredClone(cached);editedCached.revision=1;editedCached.reviews=editedCached.reviews.slice(0,1);editedCached.history=editedCached.history.slice(0,1);editedCached.updatedAt=editedCached.reviews[0].at;editedCached.form.name='my_edited_task';assert.equal(M.upgradeReviewExample({records:[editedCached]},'rong'),false);
+
+// Version groups retain scores and keep historical failures out of the current result.
+const scoreTimeline=D.timeline(M.generate('rong')[11]);assert.equal(scoreTimeline[0].revision,2);assert.equal(scoreTimeline[0].reviews.at(-1).score,94.75);assert.equal(scoreTimeline[1].reviews[0].score,undefined);
+const repeatedTimeline=D.timeline(M.generate('rong')[7]);assert.deepEqual(repeatedTimeline.map(v=>v.revision),[2,1]);assert.ok(repeatedTimeline.every(v=>v.reviews.length===1&&v.reviews[0].to==='未通过'));assert.notEqual(repeatedTimeline[0].reviews[0].note,repeatedTimeline[1].reviews[0].note);

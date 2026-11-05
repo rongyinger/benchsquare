@@ -3,7 +3,7 @@
   const W=WorkbenchModel,previous=render,oldMine=mine,oldJoin=joinButton;
   const ctx=cid=>W.context(state,cid,null,all());
   let drawer=null,opener=null,background=[],previousOverflow='';
-  const entry=cid=>'<button class="button dark" data-submit-data="'+esc(cid)+'">提交数据 →</button>';
+  const entry=cid=>'<button class="button dark" data-submit-data="'+esc(cid)+'">提交 Harbor 包 →</button>';
   joinButton=function(c){return ctx(c.id).team?entry(c.id):oldJoin(c);};
   mine=function(){return oldMine()+'<section class="wb-demo"><div><strong>体验数据提交完整流程</strong><p>创建演示比赛和团队，体验保存草稿、提交与版本记录。</p></div><button class="button" data-wb="demo">创建 / 打开提交演示 ↗</button></section>';};
   function destroy(){
@@ -47,7 +47,7 @@
     if(submit){const cid=submit.dataset.submitData;if(location.hash!=='#competition/'+cid){go('#competition/'+cid);setTimeout(()=>open(cid),0);}else open(cid);return;}
     if(!e.target.closest('[data-wb="demo"]'))return;
     const cid='workbench-demo',p=state.participation,u=p.active||'rong';
-    if(!state.competitions.some(c=>c.id===cid))state.competitions.push({id:cid,stage:'已发布',ownerId:u,values:{name:'专业评测任务征集 · 提交演示',organizer:'Benchsquare 演示工作组',domain:'科学推理',description:'体验从团队协作到任务提交的完整流程。',registrationStart:'2026-10-01T09:00',registrationEnd:'2026-10-20T18:00',submissionStart:'2026-10-21T09:00',submissionEnd:'2026-11-30T18:00',teamMode:'团队',teamMax:5,pool:10000,materials:'每个任务包含公开任务说明、输入材料，以及仅审核可见的参考结果。',environment:'说明操作系统、软件版本与依赖；支持纯文本任务。',formats:'演示支持选择任意格式附件，单文件 20 MiB，合计最多 20 个。',fields:'任务名称、领域、软件及版本、操作系统、许可、任务说明与验证标准为必填。',scale:'本演示不限制任务数量；不执行附件或真实评测。',acceptance:'目标明确、输入完整、结果可复现，验证标准可核查。'}});
+    if(!state.competitions.some(c=>c.id===cid))state.competitions.push({id:cid,stage:'已发布',ownerId:u,values:{name:'专业评测任务征集 · 提交演示',organizer:'Benchsquare 演示工作组',domain:'科学推理',description:'体验从团队协作到任务提交的完整流程。',registrationStart:'2026-10-01T09:00',registrationEnd:'2026-10-20T18:00',submissionStart:'2026-10-21T09:00',submissionEnd:'2026-11-30T18:00',teamMode:'团队',teamMax:5,pool:10000,materials:'提交包含完整任务目录的 Harbor 压缩包。',environment:'运行环境与依赖在 Harbor 包内提供。',formats:'每次提交一个 .zip、.tar.gz 或 .tgz 压缩包；本地保存上限为 1 GB。',fields:'无需单独填写任务信息，仅提交 Harbor 格式压缩包。',scale:'本演示不限制任务数量；不执行附件或真实评测。',acceptance:'目标明确、输入完整、结果可复现，验证标准可核查。'}});
     p.regs[cid]||={};p.regs[cid][u]||={at:Date.now(),rulesVersion:1};if(!p.teams.some(t=>t.cid===cid&&t.members.includes(u)))p.teams.push({id:'wb-team-'+u,cid,name:'专业任务共创队 · '+u,leader:u,members:[u],description:'任务提交体验团队',allow:false});p.workbenchClock||={};p.workbenchClock[cid]='open';if(persist()){go('#competition/'+cid);setTimeout(()=>open(cid),0);}
   });
   render();

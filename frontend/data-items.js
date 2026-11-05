@@ -5,7 +5,7 @@
   function locked(r){if(!r?.competitionId||r.status==='草稿'||r.status==='需修改')return false;if(r.status==='已审核'){const review=r.reviews?.at(-1);return review?.revision===r.revision?review.to!=='需修改':r.reviewOutcome!=='需补正';}return true;}
   function status(r){if(!r.competitionId)return '草稿';if(['已录用','已通过'].includes(r.status))return '已录用';if((r.draftForm&&!locked(r))||r.status==='草稿')return '草稿';if(['已审核','需修改','未通过'].includes(r.status))return '已审核';return '审核中';}
   const form=r=>locked(r)?r.form:r.draftForm||r.form;
-  function read(){const s=JSON.parse(localStorage.getItem(key)||'{"version":1,"records":[],"work":null}');if(s.version!==1||!Array.isArray(s.records))throw Error('本地数据格式无法读取，请先保留原始数据。');return s;}
+  function read(){const s=JSON.parse(localStorage.getItem(key)||'{"version":1,"records":[],"work":null}');if(s.version!==1||!Array.isArray(s.records))throw Error('本地数据格式无法读取，请先保留原始数据。');return root.DataMocks?root.DataMocks.upgrade(s):s;}
   function list(store,user,state){return store.records.filter(r=>owner(r,state)===user);}
   function filter(records,{search='',competition='',stage='',sort='updated'}={},competitions=[]){
     const q=search.trim().toLowerCase();return records.filter(r=>(!competition||(competition==='unbound'?!r.competitionId:r.competitionId===competition))&&(!stage||status(r)===stage)&&(!q||[form(r).name,form(r).domain,form(r).description,competitions.find(c=>c.id===r.competitionId)?.title].some(s=>String(s||'').toLowerCase().includes(q)))).sort((a,b)=>sort==='name'?String(form(a).name).localeCompare(String(form(b).name),'zh-CN'):String(sort==='created'?b.createdAt||b.history?.[0]?.at||b.updatedAt:b.updatedAt).localeCompare(String(sort==='created'?a.createdAt||a.history?.[0]?.at||a.updatedAt:a.updatedAt)));
@@ -22,6 +22,12 @@
     const rejected=current?.to==='未通过'||legacy&&(r.status==='未通过'||r.reviewOutcome==='审核不通过');
     return {current,correction,passed,rejected,score:passed&&validScore(current?.score)?current.score:null,note:current?.note||(legacy?r.reviewNote||'':''),outcome:correction?'需补正':result(r)};
   }
+  function timeline(r){
+    const versions=new Map();
+    for(const h of r.history||[])if(Number.isInteger(h.revision)&&h.revision>0)versions.set(h.revision,{...h});
+    if(r.revision&&!versions.has(r.revision))versions.set(r.revision,{revision:r.revision,number:r.number,form:r.form,at:r.submittedAt||r.createdAt,by:r.ownerId});
+    return [...versions.values()].sort((a,b)=>b.revision-a.revision).map(h=>({...h,current:h.revision===r.revision,reviews:(r.reviews||[]).filter(review=>review.revision===h.revision).sort((a,b)=>String(a.at).localeCompare(String(b.at)))}));
+  }
   const reviewLabel=r=>'已审核 · '+reviewInfo(r).outcome.split(' · ')[0];
-  const api={key,statuses,owner,status,label,reviewInfo,reviewLabel,validScore,locked,form,read,list,filter,drafts,result};if(typeof module!=='undefined')module.exports=api;else root.DataItems=api;
+  const api={key,statuses,owner,status,label,reviewInfo,reviewLabel,validScore,locked,form,read,list,filter,drafts,result,timeline};if(typeof module!=='undefined')module.exports=api;else root.DataItems=api;
 })(typeof window==='undefined'?globalThis:window);
