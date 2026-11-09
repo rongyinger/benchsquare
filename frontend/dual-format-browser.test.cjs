@@ -28,7 +28,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   await page.goto((process.env.DEMO_BASE||'http://127.0.0.1:4173/frontend/')+'#mine');await page.locator('[data-wb="demo"]').click();await page.locator('[data-dd-new]').click();
   const frame=page.frameLocator('iframe');await frame.locator('[data-format="question"]').click();
   await frame.locator('#f-name').fill('question_submission_1');await frame.locator('#f-domain').fill('Engineering');await frame.locator('#f-software').fill('Python');await frame.locator('[name="os"][value="Linux"]').check();await frame.locator('[name="license"]').first().check();await frame.locator('#f-description').fill('问题任务');await frame.locator('#f-verification').fill('验证成功');await frame.locator('#f-terms').check();
-  await frame.locator('[data-do="submit"]').click();await frame.locator('.detail-meta').waitFor();assert.match(await frame.locator('.submission-history').innerText(),/问题任务/);
+  await frame.locator('[data-do="submit"]').click();await frame.locator('.detail-meta').waitFor();await frame.locator('.version-submission-preview').click();await frame.locator('#preview[open]').waitFor();assert.match(await frame.locator('#preview-content').innerText(),/问题任务/);await frame.locator('#close-preview').click();
   assert.deepEqual(errors,[]);console.log('Dual format browser passed: selector placement, switching without loss, both attachment categories, persistence, preview, question submission/history and mobile layout.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

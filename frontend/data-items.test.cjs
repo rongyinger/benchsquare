@@ -1,15 +1,15 @@
 'use strict';
 const assert=require('node:assert/strict'),D=require('./data-items.js'),M=require('./data-mocks.js');
 const mine=M.generate('rong'),other=M.generate('xu'),store={records:[...mine,...other]};
-assert.equal(D.list(store,'rong').length,12);
-for(const stage of D.statuses)assert.equal(mine.filter(r=>D.status(r)===stage).length,3);
-assert.equal(new Set([...mine,...other].map(r=>r.id)).size,24);
+assert.equal(D.list(store,'rong').length,32);
+for(const [i,stage] of D.statuses.entries())assert.equal(mine.filter(r=>D.status(r)===stage).length,[8,8,10,6][i]);
+assert.equal(new Set([...mine,...other].map(r=>r.id)).size,64);
 assert.equal(JSON.stringify(M.generate('rong')),JSON.stringify(mine));
 assert.ok(D.drafts(mine,'code').every(r=>!r.competitionId||r.competitionId==='code'));
 assert.ok(D.drafts(mine,'code').some(r=>!r.competitionId));
-assert.equal(D.filter(mine,{competition:'code',stage:'已审核',search:'dependency'}).length,1);
-assert.equal(D.filter(mine,{competition:'unbound'}).length,1);
-const adopted=mine.at(-1),snapshot=JSON.stringify(adopted.history);adopted.draftForm={...adopted.form,description:'changed'};
+assert.equal(D.filter(mine,{competition:'code',stage:'已审核',submissionFormat:'harbor',search:'dependency_conflict'}).length,1);
+assert.equal(D.filter(mine,{competition:'unbound'}).length,2);
+const adopted=mine[11],snapshot=JSON.stringify(adopted.history);adopted.draftForm={...adopted.form,description:'changed'};
 assert.equal(D.status(adopted),'已录用');assert.equal(D.locked(adopted),true);assert.equal(D.form(adopted),adopted.form);assert.ok(!D.drafts([adopted],adopted.competitionId).length);assert.equal(JSON.stringify(adopted.history),snapshot);assert.equal(adopted.reviews.length,3);
 assert.deepEqual(mine[0].form.attachments.map(a=>a.category),['harbor']);assert.ok(!('model' in mine[0].form));assert.equal(mine[0].form.attachments[0].archive,true);assert.equal(mine[0].form.submissionFormat,'harbor');
 for(const status of ['待初审','终检中','已审核','已通过','需修改','未通过']){
@@ -46,7 +46,7 @@ for(const r of M.generate('rong')){
  }
  if(r.revision===2){
   assert.notEqual(r.history[0].form.attachments[0].name,r.history[1].form.attachments[0].name);
-  assert.notEqual(r.history[0].form.attachments[0].archivePath,r.history[1].form.attachments[0].archivePath);
+  if(r.form.submissionFormat==='harbor')assert.notEqual(r.history[0].form.attachments[0].archivePath,r.history[1].form.attachments[0].archivePath);
   assert.ok(r.history[0].at<r.history[1].at);
   assert.equal(r.form.attachments[0].id,r.history[1].form.attachments[0].id);
  }
@@ -63,3 +63,27 @@ const repeated=M.generate('rong')[7];assert.equal(repeated.revision,2);assert.de
 // Version groups retain scores and keep historical failures out of the current result.
 const scoreTimeline=D.timeline(M.generate('rong')[11]);assert.equal(scoreTimeline[0].revision,2);assert.equal(scoreTimeline[0].reviews.at(-1).score,94.75);assert.equal(scoreTimeline[1].reviews[0].score,undefined);
 const repeatedTimeline=D.timeline(M.generate('rong')[7]);assert.deepEqual(repeatedTimeline.map(v=>v.revision),[2,1]);assert.ok(repeatedTimeline.every(v=>v.reviews.length===1&&v.reviews[0].to==='未通过'));assert.notEqual(repeatedTimeline[0].reviews[0].note,repeatedTimeline[1].reviews[0].note);
+
+// Both formats cover matching lifecycle states and have distinct complete snapshots.
+const Submission=require('./submission-model.js');
+for(const format of ['harbor','question']){
+ const group=mine.filter(r=>r.form.submissionFormat===format);
+ assert.equal(group.length,16);assert.equal(new Set(group.map(r=>r.mockScenario)).size,14);
+ assert.ok(group.some(r=>!r.competitionId&&D.status(r)==='草稿'));
+ assert.ok(group.some(r=>r.status==='终检中'));
+ assert.ok(group.some(r=>r.revision===3&&D.reviewInfo(r).correction));
+ assert.ok(group.some(r=>D.reviewInfo(r).score===0));
+ assert.equal(D.filter(mine,{submissionFormat:format}).length,16);
+ for(const r of group){
+  if(format==='question'&&r.revision){
+   assert.deepEqual(Submission.validate(r.form,new Map()),{},r.form.name);
+   assert.ok(r.form.description.includes('目标：'));assert.ok(r.form.verification.includes('参考输出'));
+   assert.ok(r.history.every(h=>h.form.submissionFormat==='question'));
+  }
+  if(format==='harbor')for(const f of [r.form,r.draftForm,...r.history.map(h=>h.form)].filter(Boolean))for(const a of f.attachments)assert.ok(require('node:fs').existsSync(require('node:path').join(__dirname,a.archivePath)),a.archivePath);
+ }
+}
+const seedStore={records:[structuredClone(mine[1]),{id:'own',ownerId:'rong',form:{name:'user-draft'}}],workspaces:{keep:{form:{description:'unsaved'}}}};
+seedStore.records[0].form.name='user-edited-example';const preserved=JSON.stringify(seedStore.records[0]),work=JSON.stringify(seedStore.workspaces);
+assert.equal(M.ensureExamples(seedStore,'rong'),31);assert.equal(M.ensureExamples(seedStore,'rong'),0);assert.equal(seedStore.records.length,33);assert.equal(JSON.stringify(seedStore.records[0]),preserved);assert.equal(JSON.stringify(seedStore.workspaces),work);assert.equal(seedStore.records[1].form.name,'user-draft');
+console.log('Dual example catalog: 16 scenarios per format, valid ALE content, real archives, zero scores, three-round corrections and non-destructive idempotent loading passed.');
