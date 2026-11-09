@@ -41,7 +41,7 @@
     // Refresh only untouched bundled examples. Participant edits keep their own files and snapshots.
     const bundled=[r.form,r.draftForm,...(r.history||[]).map(h=>h.form)].filter(Boolean).every(f=>(f.attachments||[]).every(a=>a.source==='mock'||a.source==='placeholder'));
     if(r.mockVersion!==mockVersion&&bundled){const sample=generate(r.ownerId||r.updatedBy||'rong').find(x=>x.id===r.id);if(sample)return sample;}
-    if(r.form?.submissionFormat==='harbor')return r;
+    if(['harbor','question'].includes(r.form?.submissionFormat))return r;
     return {...r,form:packageForm(r.form,r.id,r.revision||1),...(r.draftForm?{draftForm:packageForm(r.draftForm,r.id+'-draft',(r.revision||0)+1)}:{}),history:(r.history||[]).map(h=>({...h,...(h.form?{form:packageForm(h.form,r.id+'-v'+h.revision,h.revision)}:{})}))};
   })};}
   function upgradeScores(store,user){const seeds=new Map(generate(user).map(r=>[r.id,r]));let changed=false;for(const r of store.records){const seed=r.mock&&seeds.get(r.id);if(!seed)continue;for(const h of r.reviews||[]){const original=seed.reviews.find(v=>v.revision===h.revision&&v.to===h.to&&v.at===h.at&&v.note===h.note);if(h.score===undefined&&original?.score!==undefined){h.score=original.score;changed=true;}}}return changed;}

@@ -12,8 +12,8 @@ assert.equal(M.archiveError({...meta,size:50*1024**3}),'');
 assert.ok(M.validate({...f,attachments:[meta,{...meta,id:'another'}]},files).attachments);
 assert.ok(M.validate({...f,attachments:[{...meta,source:'placeholder'}]},files).attachments);
 const legacy=M.normalize({...M.sample(),consent:true,terms:true}),before=JSON.stringify(legacy);
-assert.ok(M.validate(legacy,files).attachments,'old loose attachments cannot replace a Harbor package');
-const migrated=M.forSubmission({...legacy,attachments:[...legacy.attachments,meta]});
+assert.equal(M.format(legacy),'question');assert.deepEqual(M.validate(legacy,files),{},'legacy question forms remain valid');
+const migrated=M.forSubmission({...legacy,submissionFormat:'harbor',attachments:[...legacy.attachments,meta]});
 assert.equal(migrated.name,'my-task');assert.equal(migrated.submissionFormat,'harbor');
 assert.equal(migrated.description,'');assert.equal(migrated.software,'');assert.equal(migrated.attachments.length,1);
 assert.deepEqual(M.validate(migrated,files),{});assert.equal(JSON.stringify(legacy),before,'legacy records and snapshots remain intact');
@@ -24,3 +24,5 @@ assert.equal(M.archiveName('task.v2.ZIP'),'task.v2');
 const html=M.markdown('<img src=x onerror=alert(1)>\n<script>alert(2)</script>\n[x](javascript:alert(3))');
 assert.ok(!html.includes('<img'));assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<a'));
 console.log('Harbor submission model: required single archive, formats, size, actual files, legacy migration and safe rendering passed.');
+
+const question=M.sample();question.consent=true;question.terms=true;assert.deepEqual(M.validate(question,new Map()),{});assert.ok(M.validate({...question,description:''},new Map()).description);assert.equal(M.format(M.normalize({description:'old question'})),'question');assert.equal(M.format(M.empty()),'harbor');assert.equal(M.forSubmission(question).submissionFormat,'question');
