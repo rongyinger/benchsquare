@@ -37,9 +37,9 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
      await card.locator('summary').focus();await page.keyboard.press('Enter');assert.equal(await card.getAttribute('open'),null);
      await page.keyboard.press('Enter');assert.notEqual(await card.getAttribute('open'),null);
      if(r.form.submissionFormat==='question'){
-      assert.equal(await card.locator('.version-package button').innerText(),'预览提交');
+      assert.equal(await card.locator('.version-package .archive-action').innerText(),'预览提交');
       assert.equal(await card.locator('.version-package [data-download]').count(),0);
-     }else assert.match(await card.locator('.version-package').innerText(),/下载压缩包/);
+     }else assert.match(await card.locator('.version-package .archive-card').getAttribute('aria-label'),/下载压缩包/);
      await card.locator('[data-do^="history:"]').click();await frame().locator('#preview[open]').waitFor();
      assert.equal(await frame().locator('#preview-content .read-field').count()>0,r.form.submissionFormat==='question');
      if(r.form.submissionFormat==='question')assert.match(await frame().locator('#preview-content').innerText(),new RegExp('提交版本：v'+version.revision));
