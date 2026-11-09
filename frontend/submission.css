@@ -8,4 +8,14 @@
 
 .review-final-score{margin:22px 0 8px}.review-final-score>span{display:block;font-size:12px;color:#7b8797;margin-bottom:9px}.review-final-score strong{font-size:38px;line-height:1.4;color:#263f34;font-variant-numeric:tabular-nums}.review-final-score small{font-size:13px;margin-left:8px;font-weight:400;color:#7d8d84}.review-simulator input[type=number]{display:block;width:100%;margin:10px 0 20px;padding:12px;border:1px solid #ddd}
 
-.submission-format{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 20px}.submission-format .btn{min-width:140px;flex:1}.submission-format .btn[aria-pressed="true"]{box-shadow:inset 0 0 0 1px currentColor}
+/* Mutually exclusive draft format choices */
+.submission-format{display:flex;align-items:stretch;gap:32px;padding:0 4px;margin:0 0 24px;border:0;border-radius:0;background:transparent}
+.submission-format .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;flex:0 0 auto;min-width:0;min-height:44px;padding:10px 4px;border:0;border-radius:0;background:transparent;box-shadow:none;color:#70757a;font-size:14px;font-weight:500;line-height:1.6;transition:color .16s}
+.submission-format .btn:before{content:'';display:inline-flex;align-items:center;justify-content:center;flex:0 0 16px;width:16px;height:16px;border:1.5px solid #b2b8bd;border-radius:3px;background:#fff;color:#fff;font:600 12px/1 Arial,sans-serif;transition:background .16s,border-color .16s}
+.submission-format .btn:after{content:none}
+.submission-format .btn:hover{background:transparent;color:#202124;border:0;box-shadow:none}
+.submission-format .btn[aria-pressed="true"]{background:transparent;border:0;color:#202124;font-weight:600;box-shadow:none}
+.submission-format .btn[aria-pressed="true"]:before{content:'✓';background:#202124;border-color:#202124}
+.submission-format .btn:focus-visible{outline:2px solid #7b8186;outline-offset:4px;border-radius:3px}
+@media(max-width:420px){.submission-format{gap:28px;margin-bottom:20px}.submission-format .btn{font-size:13px}}
+@media(prefers-reduced-motion:reduce){.submission-format .btn,.submission-format .btn:before{transition:none}}
