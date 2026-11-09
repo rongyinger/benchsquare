@@ -29,7 +29,6 @@
     if(attachments.length!==1)e.attachments='请提交一个 Harbor 格式的压缩包';
     else if(archiveError(attachments[0]))e.attachments=archiveError(attachments[0]);
     else if(attachments[0].source!=='file'||!files.has(attachments[0].id))e.attachments='压缩包文件不可用，请重新选择后提交';
-    if(f.consent!==true)e.consent='请勾选提交确认';
     if(f.terms!==true)e.terms='请勾选诚信承诺并同意条款与条件';
     return e;
   }
@@ -40,7 +39,6 @@
     if(!Array.isArray(f.os)||f.os.length!==1||!operatingSystems.includes(f.os[0]))e.os='请选择一个操作系统';
     if(!licenses.includes(f.license))e.license='请选择软件许可';
     if(f.cloudLink){try{const u=new URL(f.cloudLink);if(u.protocol!=='https:'||!['drive.google.com','docs.google.com','dropbox.com','www.dropbox.com'].includes(u.hostname)||u.username||u.password)throw Error();}catch{e.cloudLink='请填写 https:// 开头的 Google Drive 或 Dropbox 分享链接';}}
-    if(!f.consent)e.consent='请确认工作流可用于 Agents’ Last Exam 评测';
     if(!f.terms)e.terms='请阅读并勾选条款确认';
     if(unavailable(f,files).length)e.attachments='部分附件仅剩元信息，请重新选择对应文件，或删除后提交';
     if(activeAttachments(f).some(a=>a.size>config.maxFileBytes))e.attachments='单文件不能超过 50 GB';

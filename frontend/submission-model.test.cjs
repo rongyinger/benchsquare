@@ -17,7 +17,7 @@ const migrated=M.forSubmission({...legacy,submissionFormat:'harbor',attachments:
 assert.equal(migrated.name,'my-task');assert.equal(migrated.submissionFormat,'harbor');
 assert.equal(migrated.description,'');assert.equal(migrated.software,'');assert.equal(migrated.attachments.length,1);
 assert.deepEqual(M.validate(migrated,files),{});assert.equal(JSON.stringify(legacy),before,'legacy records and snapshots remain intact');
-assert.ok(M.validate({...f,consent:false},files).consent);
+assert.deepEqual(M.validate({...f,consent:false},files),{},'only the integrity pledge is required');
 assert.ok(M.validate({...f,terms:false},files).terms);
 assert.equal(M.forSubmission(f).consent,true);assert.equal(M.forSubmission(f).terms,true);
 assert.equal(M.archiveName('task.v2.ZIP'),'task.v2');
@@ -26,3 +26,5 @@ assert.ok(!html.includes('<img'));assert.ok(!html.includes('<script>'));assert.o
 console.log('Harbor submission model: required single archive, formats, size, actual files, legacy migration and safe rendering passed.');
 
 const question=M.sample();question.consent=true;question.terms=true;assert.deepEqual(M.validate(question,new Map()),{});assert.ok(M.validate({...question,description:''},new Map()).description);assert.equal(M.format(M.normalize({description:'old question'})),'question');assert.equal(M.format(M.empty()),'harbor');assert.equal(M.forSubmission(question).submissionFormat,'question');
+
+assert.deepEqual(M.validate({...question,consent:false},new Map()),{});
