@@ -1,0 +1,193 @@
+'use strict';
+
+const assert=require('node:assert/strict');
+const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
+const base=process.env.DEMO_BASE||'http://127.0.0.1:4173/frontend/';
+const cid='identity-verification-demo',second='profile-registration-second';
+const exampleName='演示用户',exampleNumber='000000200001010010';
+
+(async()=>{
+  const browser=await chromium.launch({channel:'msedge',headless:true});
+  try{
+    const page=await browser.newPage({viewport:{width:1440,height:950}});
+    page.setDefaultTimeout(10000);
+    const errors=[],posts=[];
+    page.on('pageerror',error=>errors.push(error.message));
+    page.on('request',request=>{if(request.method()==='POST')posts.push(request.url());});
+    const route=hash=>base+'#'+hash;
+    const button=name=>page.getByRole('button',{name,exact:true});
+    const title=name=>page.getByRole('heading',{name,exact:true});
+    const dialog=page.locator('#dialog');
+    const signup=page.getByRole('dialog',{name:'报名参加比赛',exact:true});
+    const verifyLink=button('点击这里完成实名认证');
+    const form=page.locator('#expert-identity-form');
+    const name=form.getByRole('textbox',{name:'姓名',exact:true});
+    const number=form.getByRole('textbox',{name:'身份证号码',exact:true});
+    const read=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('ale-frontend-v1')));
+    const profileMenu=()=>page.locator('.site-header [data-action="profile"]').click();
+    async function switchTo(user){
+      await page.locator('[data-expert="demo"]').click();
+      await page.locator('#participation-user').selectOption(user);
+      await button('应用演示设置').click();
+    }
+    async function confirmRegistration(){
+      await button('报名参加比赛').click();
+      await dialog.getByRole('heading',{name:'报名参加比赛',exact:true}).waitFor();
+      assert.equal(await dialog.getByRole('textbox').count(),0);
+      assert.equal(await verifyLink.count(),0);
+      await dialog.getByRole('checkbox').check();
+      await button('确认报名').click();
+      await title('报名成功，继续完成组队').waitFor();
+    }
+
+    await page.goto(route('discover'));
+    await profileMenu();
+    await page.locator('.expert-menu [data-expert="profile-page"]').click();
+    await page.getByRole('dialog',{name:'个人资料'}).waitFor();
+    assert.equal(page.url(),route('discover'));
+    await button('编辑个人资料').click();
+    await title('让队友认识你的专业').waitFor();
+    await button('取消').click();
+    await page.getByRole('dialog',{name:'个人资料'}).waitFor();
+    await button('预览专家名片').click();
+    await button('返回个人资料').click();
+    assert.equal(await form.count(),0);
+    await button('开始实名认证').click();
+    await page.getByRole('dialog',{name:'实名认证',exact:true}).waitFor();
+    assert.equal(await dialog.getByRole('heading',{name:'专家名片',exact:true}).count(),0);
+    await name.fill(exampleName);
+    await button('返回').click();
+    await page.getByRole('dialog',{name:'个人资料',exact:true}).waitFor();
+    assert.equal(await form.count(),0);
+    await button('开始实名认证').click();
+    assert.equal(await name.inputValue(),'');
+    await name.fill(exampleName);
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({state:'hidden'});
+    await page.waitForFunction(()=>document.querySelector('#expert-identity-form [name=realName]').value==='');
+    assert.equal(page.url(),route('discover'));
+
+    await page.goto(route('explore'));
+    const sample=page.locator('#results .competition-card').first();
+    assert.match(await sample.innerText(),/赛事身份认证体验赛/);
+    await page.evaluate(id=>{
+      const key='ale-frontend-v1',state=JSON.parse(localStorage.getItem(key));
+      state.competitions.find(c=>c.id===id).values.registrationEnd='2000-01-01T00:00:00+08:00';
+      localStorage.setItem(key,JSON.stringify(state));
+    },cid);
+    await page.reload();
+    await sample.getByRole('link',{name:'赛事身份认证体验赛',exact:true}).click();
+    await page.getByRole('tab',{name:'参赛规则',exact:true}).click();
+    await page.locator('#main').getByText('报名赛事前，请先在个人资料完成一次实名认证。',{exact:true}).waitFor();
+    await button('报名参加比赛').click();
+    await signup.waitFor();
+    assert.match(await signup.innerText(),/参赛资格：[\s\S]*参赛形式：[\s\S]*人数上限：[\s\S]*报名后需创建或加入团队/);
+    assert.match(await signup.locator('#registration-verification-hint').innerText(),/您还没有完成实名认证，点击这里完成实名认证/);
+    assert.equal(await button('确认报名').isEnabled(),false);
+    await signup.getByRole('checkbox').check();
+    assert.equal(await button('确认报名').isEnabled(),false);
+    await verifyLink.click();
+    await page.getByRole('dialog',{name:'实名认证',exact:true}).waitFor();
+    assert.equal(page.url(),route('competition/'+cid));
+    assert.match(await dialog.innerText(),/请先完成实名认证/);
+    assert.equal(await dialog.evaluate(el=>el.matches(':modal')),true);
+    assert.equal(await form.getByRole('textbox').count(),2);
+    await button('返回').click();
+    await signup.waitFor();
+    assert.equal(await signup.getByRole('checkbox').isChecked(),true);
+    await verifyLink.click();
+    await page.getByRole('dialog',{name:'实名认证',exact:true}).waitFor();
+    await name.fill(exampleName);
+    await number.fill('12');
+    await button('立即核验').click();
+    assert.match(await form.getByRole('alert').innerText(),/18 位身份证号码/);
+    await number.fill(exampleNumber);
+    await name.fill('不匹配的示例姓名');
+    await button('立即核验').click();
+    assert.match(await form.getByRole('alert').innerText(),/未匹配/);
+    assert.equal((await read()).participation.accounts.rong,undefined);
+    await name.fill(exampleName);
+    await button('立即核验').click();
+    await signup.waitFor();
+    assert.equal(page.url(),route('competition/'+cid));
+    assert.equal(await page.locator('[data-tab="参赛规则"]').getAttribute('aria-selected'),'true');
+    assert.equal(await button('确认报名').isEnabled(),true);
+    assert.equal(await verifyLink.count(),0);
+    assert.equal(await signup.getByRole('checkbox').isChecked(),true);
+    const verified=(await read()).participation;
+    assert.ok(verified.accounts.rong.realNameVerifiedAt);
+    assert.equal(verified.regs[cid].rong,undefined,'verification alone does not register');
+    assert.equal(JSON.stringify(verified).includes(exampleNumber),false);
+    assert.equal(JSON.stringify(verified).includes(exampleName),false);
+    assert.equal(JSON.stringify(verified).includes('不匹配的示例姓名'),false);
+    assert.deepEqual(posts,[]);
+    await signup.getByRole('checkbox').uncheck();
+    await button('确认报名').click();
+    assert.equal((await read()).participation.regs[cid].rong,undefined,'rules must be accepted');
+    await dialog.getByRole('checkbox').check();
+    await button('确认报名').click();
+    await title('报名成功，继续完成组队').waitFor();
+    await button('创建团队').click();
+    await dialog.getByLabel('团队名称').fill('实名体验组');
+    await button('创建团队并正式参赛').click();
+    await title('我的团队').waitFor();
+
+    await profileMenu();
+    await page.locator('.expert-menu [data-expert="profile-page"]').click();
+    await page.getByRole('dialog',{name:'个人资料'}).waitFor();
+    await page.getByText('已认证',{exact:true}).waitFor();
+    assert.equal(await form.count(),0);
+    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+    await profileMenu();
+    await page.locator('.expert-menu [data-expert="account"]').click();
+    await dialog.getByLabel('联系邮箱（仅自己可见）').fill('demo@example.test');
+    await button('保存设置').click();
+    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+    assert.equal((await read()).participation.accounts.rong.realNameVerifiedAt,verified.accounts.rong.realNameVerifiedAt);
+
+    await page.evaluate(({id,next})=>{
+      const key='ale-frontend-v1',state=JSON.parse(localStorage.getItem(key));
+      const source=state.competitions.find(c=>c.id===id);
+      state.competitions.push({...source,id:next,values:{...source.values,name:'第二场报名测试赛'}});
+      localStorage.setItem(key,JSON.stringify(state));
+    },{id:cid,next:second});
+    await page.goto(route('competition/'+second));
+    await page.reload();
+    await confirmRegistration();
+    assert.ok((await read()).participation.regs[second].rong);
+    assert.equal((await read()).participation.accounts.rong.realNameVerifiedAt,verified.accounts.rong.realNameVerifiedAt);
+
+    await switchTo('xu');
+    await page.setViewportSize({width:390,height:844});
+    await page.goto(route('competition/'+cid));
+    await button('报名参加比赛').click();
+    await signup.waitFor();
+    const confirm=await button('确认报名').boundingBox();
+    const hint=await signup.locator('#registration-verification-hint').boundingBox();
+    assert.ok(Math.abs(hint.x-confirm.x)<1&&hint.y>confirm.y+confirm.height,'The red hint belongs below the button at the left');
+    await verifyLink.click();
+    await form.waitFor();
+    assert.equal(page.url(),route('competition/'+cid));
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    const back=await button('返回').boundingBox();
+    const modal=await dialog.boundingBox();
+    assert.ok(back.x<modal.x+modal.width/2&&back.y<modal.y+modal.height/3,'Back belongs at the upper left');
+    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+    assert.equal(page.url(),route('competition/'+cid));
+    await page.goto(route('profile/verification/'+cid));
+    await form.waitFor();
+    await page.waitForURL(route('competition/'+cid));
+    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+    assert.equal((await read()).participation.accounts.xu,undefined);
+
+    await page.setViewportSize({width:1440,height:950});
+    await page.goto(route('organizer'));
+    await page.locator('#main .page-heading [data-action="create"]').click();
+    await page.locator('[data-step="2"]').click();
+    assert.equal(await page.locator('select[name="identityVerification"]').count(),0);
+    assert.deepEqual(errors,[]);
+    console.log('Competition identity: profile and verification modals, preserved routes, editing and preview, data privacy, account settings and cross-event reuse passed.');
+  }finally{
+    await browser.close();
+  }
+})().catch(error=>{console.error(error);process.exitCode=1;});

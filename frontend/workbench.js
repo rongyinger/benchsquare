@@ -4,7 +4,7 @@
   const ctx=cid=>W.context(state,cid,null,all());
   let drawer=null,opener=null,background=[],previousOverflow='';
   const entry=cid=>'<button class="button dark" data-submit-data="'+esc(cid)+'">提交 Harbor 包 →</button>';
-  joinButton=function(c){return ctx(c.id).team?entry(c.id):oldJoin(c);};
+  joinButton=function(c){const x=ctx(c.id);return x.team&&x.identityVerified?entry(c.id):oldJoin(c);};
   mine=function(){return oldMine()+'<section class="wb-demo"><div><strong>体验数据提交完整流程</strong><p>创建演示比赛和团队，体验保存草稿、提交与版本记录。</p></div><button class="button" data-wb="demo">创建 / 打开提交演示 ↗</button></section>';};
   function destroy(){
     if(!drawer)return;
