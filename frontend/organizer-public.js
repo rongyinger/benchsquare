@@ -58,7 +58,7 @@
     data=openRegistrationData(id);
     if(data.participantRegistration)return window.EventContact?.openGroup(data.event,{registered:false});
     const {event}=data;
-    modal('<h2 id="op-registration-title">报名参加比赛</h2><p>'+esc(event.title)+'</p><div class="review-summary"><p><b>参赛形式：</b>'+esc(event.values.teamMode)+'</p><p><b>人数上限：</b>'+esc(event.values.teamMax)+' 人</p></div><div class="notice">报名成功后请扫码加入赛事企业微信群，获取规则答疑和后续赛事通知。本次报名仅保存在本赛事示例中。</div><label class="check"><input id="op-registration-rules" type="checkbox" '+(rulesAccepted?'checked':'')+'>我已阅读并同意比赛规则与数据许可（v1.0）</label><p id="op-registration-error" role="alert"></p><button type="button" class="button dark" data-op-confirm-register="'+esc(id)+'" data-actor="'+esc(actor)+'">确认报名</button>');
+    modal('<h2 id="op-registration-title">报名参加比赛</h2><p>'+esc(event.title)+'</p><div class="review-summary"><p>报名需在个人资料完成实名认证并上传简历。</p><p><b>参赛形式：</b>'+esc(event.values.teamMode)+'</p><p><b>人数上限：</b>'+esc(event.values.teamMax)+' 人</p></div><div class="notice">报名成功后请扫码加入赛事企业微信群，获取规则答疑和后续赛事通知。本次报名仅保存在本赛事示例中。</div><label class="check"><input id="op-registration-rules" type="checkbox" '+(rulesAccepted?'checked':'')+'>我已阅读并同意比赛规则与数据许可（v1.0）</label><p id="op-registration-error" role="alert"></p><button type="button" class="button dark" data-op-confirm-register="'+esc(id)+'" data-actor="'+esc(actor)+'">确认报名</button>');
   }
   document.addEventListener('click',async e=>{
     const button=e.target.closest('[data-op-register],[data-op-confirm-register]');if(!button)return;

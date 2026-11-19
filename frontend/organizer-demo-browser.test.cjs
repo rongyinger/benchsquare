@@ -124,6 +124,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     await resumeForm.locator('[name="resume"]').setInputFiles({name:'resume.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\n%%EOF')});
     await resumeForm.locator('button[type="submit"]').click();
     await resumeForm.locator('[data-resume-continue]').click();
+    await page.locator('#dialog').getByText('报名需在个人资料完成实名认证并上传简历。',{exact:true}).waitFor();
     await page.locator('#op-registration-rules').check();
     await page.locator('[data-op-confirm-register="od-chart"]').click();
     const registrationGroup=page.locator('#event-contact-dialog[open]');

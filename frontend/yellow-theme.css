@@ -228,7 +228,8 @@ input,select,textarea,.demo-month-label select{background:#fff;border-color:#e5e
 .competition-registration .check input{width:18px;height:18px;flex:none;margin:3px 0 0}
 .competition-registration [type="submit"]{min-height:44px;font-size:15px}
 .competition-registration [type="submit"]:disabled{background:#e5e7eb;border-color:#e5e7eb;color:#4b5563;opacity:1}
-#registration-verification-hint{margin:12px 0 0;color:#b91c1c;font-size:13px;line-height:1.6}
-#registration-verification-hint button{padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:2px}
+.competition-registration .registration-requirement-hint{margin:12px 0 0;color:#b91c1c;font-size:13px;line-height:1.6}
+.competition-registration .registration-requirement-hint + .registration-requirement-hint{margin-top:6px}
+.registration-requirement-hint button{padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:2px}
 
 @media(max-width:700px){.admin-page #main{padding:24px 16px}.admin-filters{flex-wrap:wrap}.admin-filters label{flex:1}.admin-filters input,.admin-filters select{min-width:0;width:100%}}

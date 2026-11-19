@@ -123,18 +123,18 @@ function perform(a,c,b){const t=c&&teamFor(c.id),target=db.teams.find(t=>t.id===
 function registrationOpen(c){return c?.status==='报名中'&&!locked(c);}
 const loggedOut=()=>sessionStorage.getItem('expert-demo-out')==='yes';
 
+async function resumeStatus(actor){
+ try{return Boolean(await window.ResumeFiles.get(actor));}
+ catch{return null;}
+}
+
 async function requireResume({actor,isCurrent,onContinue}){
  if(loggedOut())return fail('请先在个人中心登录演示身份。');
  const stillCurrent=()=>actor===uid()&&!loggedOut()&&isCurrent();
  if(!stillCurrent())return false;
- let resume;
- try{
-  resume=await window.ResumeFiles.get(actor);
- }catch{
-  if(stillCurrent())fail('暂时无法读取简历，请检查浏览器存储后重试。');
-  return false;
- }
+ const resume=await resumeStatus(actor);
  if(!stillCurrent())return false;
+ if(resume===null)return fail('暂时无法读取简历，请检查浏览器存储后重试。');
  if(resume)return true;
  window.expertCenter.openResume({onContinue});
  return false;
@@ -142,34 +142,47 @@ async function requireResume({actor,isCurrent,onContinue}){
 
 function requestIdentity(c){window.expertProfile.openVerification(c.id);}
 
+function continueRegistration(cid,actor,rulesAccepted){
+ const route=location.hash;
+ return ()=>{if(uid()===actor&&location.hash===route)openRegistration(find(cid),rulesAccepted);};
+}
+
 async function openRegistration(c,rulesAccepted=false){
  if(!registrationOpen(c)){close();return fail('当前不在报名期。');}
  if(reg(c.id)){close();return fail('你已报名。');}
- const actor=uid();
- const canConfirm=Boolean(identity.verifiedAt(db,actor))&&!loggedOut();
- if(canConfirm){
+ const actor=uid(),signedIn=!loggedOut();
+ let resume=null;
+ if(signedIn){
   const route=location.hash,dialog=$('#dialog'),content=$('#dialog-content').firstElementChild,wasOpen=dialog.open;
-  const isCurrent=()=>location.hash===route&&dialog.open===wasOpen&&$('#dialog-content').firstElementChild===content;
-  const onContinue=()=>{if(uid()===actor&&location.hash===route)openRegistration(find(c.id),rulesAccepted);};
-  if(!await requireResume({actor,isCurrent,onContinue}))return;
-  if(actor!==uid()||!isCurrent())return;
+  resume=await resumeStatus(actor);
+  if(actor!==uid()||loggedOut()||location.hash!==route||dialog.open!==wasOpen||$('#dialog-content').firstElementChild!==content)return;
   c=find(c.id);
   if(!registrationOpen(c)){close();return fail('当前不在报名期。');}
   if(reg(c.id)){close();return fail('你已报名。');}
  }
+ const verified=signedIn&&Boolean(identity.verifiedAt(db,actor));
+ if(verified&&resume===false){
+  return window.expertCenter.openResume({onContinue:continueRegistration(c.id,actor,rulesAccepted)});
+ }
+ const hints=[
+  !verified?'registration-verification-hint':'',
+  signedIn&&resume!==true?'registration-resume-hint':''
+ ].filter(Boolean).join(' ');
  modal(`<div class="competition-registration">
   <h2 id="competition-registration-title">报名参加比赛</h2>
   <p class="competition-registration-event">${esc(c.title)}</p>
   <form id="competition-registration-form" data-cid="${esc(c.id)}" data-actor="${esc(actor)}">
     <div class="review-summary">
       <p><b>参赛资格：</b>${esc(c.values.eligibility)}</p>
+      <p><b>报名要求：</b>完成实名认证并上传参赛简历。</p>
       <p><b>参赛形式：</b>${esc(c.values.teamMode)}</p>
       <p><b>人数上限：</b>${esc(c.values.teamMax)} 人</p>
     </div>
     <div class="notice">报名后需创建或加入团队。截止前支持退队、队长移除成员和移交队长；截止后全部锁定。</div>
     <label class="check"><input name="rules" type="checkbox" required ${rulesAccepted?'checked':''}>我已阅读并同意比赛规则与数据许可（v1.0）</label>
-    <button class="button dark" type="submit" ${canConfirm?'':'disabled aria-describedby="registration-verification-hint"'}>确认报名</button>
-    ${canConfirm?'':`<p id="registration-verification-hint">您还没有完成实名认证，<button type="button" data-part="registration-verify" data-cid="${esc(c.id)}">点击这里完成实名认证</button></p>`}
+    <button class="button dark" type="submit" ${hints?`disabled aria-describedby="${hints}"`:''}>确认报名</button>
+    ${verified?'':`<p class="registration-requirement-hint" id="registration-verification-hint">您还没有完成实名认证，<button type="button" data-part="registration-verify" data-cid="${esc(c.id)}">点击这里完成实名认证</button></p>`}
+    ${signedIn&&resume!==true?`<p class="registration-requirement-hint" id="registration-resume-hint">${resume===false?'您还没有上传参赛简历，':'暂时无法读取简历状态。'}<button type="button" data-part="registration-resume" data-cid="${esc(c.id)}">前往上传简历</button></p>`:''}
   </form>
  </div>`);
 }
@@ -183,7 +196,7 @@ async function submitRegistration(form){
  if(!identity.verifiedAt(db,user)||loggedOut())return openRegistration(c,form.elements.rules.checked);
  if(!form.elements.rules.checked)return fail('请先阅读并同意比赛规则。');
  const isCurrent=()=>location.hash===route&&$('#dialog').open&&$('#competition-registration-form')===form;
- const onContinue=()=>{if(uid()===user&&location.hash===route)openRegistration(find(cid),true);};
+ const onContinue=continueRegistration(cid,user,true);
  if(!await requireResume({actor:user,isCurrent,onContinue}))return;
  if(user!==uid()||loggedOut()||!isCurrent())return;
  c=find(cid);
@@ -231,10 +244,14 @@ document.addEventListener('submit',e=>{
 },true);
 
 const originalPerform=perform;perform=function(a,c,b){
- if(a==='registration-verify'){
+ if(a==='registration-verify'||a==='registration-resume'){
   const form=b.closest('#competition-registration-form');
-  if(!form||form.dataset.actor!==uid()||form.dataset.cid!==c?.id)return;
-  return window.expertProfile.openVerification(c.id,{rulesAccepted:form.elements.rules.checked});
+  const actor=uid();
+  if(!form||!$('#dialog').open||form.dataset.actor!==actor||form.dataset.cid!==c?.id)return;
+  if(!registrationOpen(c)){close();return fail('当前不在报名期。');}
+  const rulesAccepted=form.elements.rules.checked;
+  if(a==='registration-verify')return window.expertProfile.openVerification(c.id,{rulesAccepted});
+  return window.expertCenter.openResume({onContinue:continueRegistration(c.id,actor,rulesAccepted)});
  }
  if(a==='delete-expired'){
   if(!c||!reg(c.id)||mineStage(c)!=='expired')return fail('仅可删除本人报名失效的比赛。');
