@@ -121,20 +121,46 @@ function perform(a,c,b){const t=c&&teamFor(c.id),target=db.teams.find(t=>t.id===
  save();close();render();toast('操作成功，状态与通知已同步。');}
 
 function registrationOpen(c){return c?.status==='报名中'&&!locked(c);}
-function canConfirmRegistration(user){
- return Boolean(identity.verifiedAt(db,user))&&sessionStorage.getItem('expert-demo-out')!=='yes';
+const loggedOut=()=>sessionStorage.getItem('expert-demo-out')==='yes';
+
+async function requireResume({actor,isCurrent,onContinue}){
+ if(loggedOut())return fail('请先在个人中心登录演示身份。');
+ const stillCurrent=()=>actor===uid()&&!loggedOut()&&isCurrent();
+ if(!stillCurrent())return false;
+ let resume;
+ try{
+  resume=await window.ResumeFiles.get(actor);
+ }catch{
+  if(stillCurrent())fail('暂时无法读取简历，请检查浏览器存储后重试。');
+  return false;
+ }
+ if(!stillCurrent())return false;
+ if(resume)return true;
+ window.expertCenter.openResume({onContinue});
+ return false;
 }
 
 function requestIdentity(c){window.expertProfile.openVerification(c.id);}
 
-function openRegistration(c,rulesAccepted=false){
+async function openRegistration(c,rulesAccepted=false){
  if(!registrationOpen(c)){close();return fail('当前不在报名期。');}
  if(reg(c.id)){close();return fail('你已报名。');}
- const canConfirm=canConfirmRegistration(uid());
+ const actor=uid();
+ const canConfirm=Boolean(identity.verifiedAt(db,actor))&&!loggedOut();
+ if(canConfirm){
+  const route=location.hash,dialog=$('#dialog'),content=$('#dialog-content').firstElementChild,wasOpen=dialog.open;
+  const isCurrent=()=>location.hash===route&&dialog.open===wasOpen&&$('#dialog-content').firstElementChild===content;
+  const onContinue=()=>{if(uid()===actor&&location.hash===route)openRegistration(find(c.id),rulesAccepted);};
+  if(!await requireResume({actor,isCurrent,onContinue}))return;
+  if(actor!==uid()||!isCurrent())return;
+  c=find(c.id);
+  if(!registrationOpen(c)){close();return fail('当前不在报名期。');}
+  if(reg(c.id)){close();return fail('你已报名。');}
+ }
  modal(`<div class="competition-registration">
   <h2 id="competition-registration-title">报名参加比赛</h2>
   <p class="competition-registration-event">${esc(c.title)}</p>
-  <form id="competition-registration-form" data-cid="${esc(c.id)}" data-actor="${esc(uid())}">
+  <form id="competition-registration-form" data-cid="${esc(c.id)}" data-actor="${esc(actor)}">
     <div class="review-summary">
       <p><b>参赛资格：</b>${esc(c.values.eligibility)}</p>
       <p><b>参赛形式：</b>${esc(c.values.teamMode)}</p>
@@ -148,12 +174,22 @@ function openRegistration(c,rulesAccepted=false){
  </div>`);
 }
 
-function submitRegistration(form){
- const c=find(form.dataset.cid),user=uid();
+async function submitRegistration(form){
+ const cid=form.dataset.cid,user=uid(),route=location.hash;
+ let c=find(cid);
  if(form.dataset.actor!==user)return fail('演示身份已变化，请重新报名。');
  if(!registrationOpen(c))return fail('报名组队已截止。');
  if(reg(c.id))return fail('你已报名。');
- if(!canConfirmRegistration(user))return openRegistration(c,form.elements.rules.checked);
+ if(!identity.verifiedAt(db,user)||loggedOut())return openRegistration(c,form.elements.rules.checked);
+ if(!form.elements.rules.checked)return fail('请先阅读并同意比赛规则。');
+ const isCurrent=()=>location.hash===route&&$('#dialog').open&&$('#competition-registration-form')===form;
+ const onContinue=()=>{if(uid()===user&&location.hash===route)openRegistration(find(cid),true);};
+ if(!await requireResume({actor:user,isCurrent,onContinue}))return;
+ if(user!==uid()||loggedOut()||!isCurrent())return;
+ c=find(cid);
+ if(!registrationOpen(c))return fail('报名组队已截止。');
+ if(reg(cid))return fail('你已报名。');
+ if(!identity.verifiedAt(db,user))return openRegistration(c,form.elements.rules.checked);
  if(!form.elements.rules.checked)return fail('请先阅读并同意比赛规则。');
  db.regs[c.id] ||= {};
  db.regs[c.id][user]={at:Date.now(),rulesVersion:1};
@@ -167,6 +203,7 @@ function submitRegistration(form){
  detailTab='团队';
  go('#competition/'+c.id);
  toast('报名成功，请继续完成组队。');
+ window.EventContact?.openGroup(c,{registered:true,onContinue:()=>{detailTab='团队';go('#competition/'+c.id);}});
 }
 
 document.addEventListener('click',e=>{
@@ -210,8 +247,8 @@ const originalPerform=perform;perform=function(a,c,b){
  if(a==='identity-resume'&&c&&!locked(c)&&!eligible(c))return requestIdentity(c);
  return originalPerform(a,c,b);};
 document.addEventListener('submit',e=>{const f=e.target;if(!['participation-create','participation-apply'].includes(f.id))return;e.preventDefault();e.stopImmediatePropagation();const c=find(f.dataset.cid),data=new FormData(f);if(!allowed(c)||!eligible(c)||teamFor(c.id))return fail('当前不能创建或申请团队，请检查本赛事参赛资格。');if(f.id==='participation-create'){const name=String(data.get('name')||'').trim();if(!name||name.length>30)return fail('请输入不超过30字的团队名称。');db.teams.push({id:key(),cid:c.id,name,description:String(data.get('description')||''),leader:uid(),members:[uid()],allow:c.values?.teamMode!=='仅个人参赛'&&data.has('allow')});invalidate(c.id,uid());message(uid(),c,'团队「'+name+'」创建成功，你已正式参赛。');}else {if(c.values?.teamMode==='仅个人参赛')return fail('本比赛仅限个人参赛，请创建单人团队。');const t=db.teams.find(t=>t.id===f.dataset.tid);if(!t?.allow||t.cid!==c.id||t.members.length>=Number(c.values?.teamMax||5))return fail('该团队当前不可申请。');if(db.applications.some(r=>r.tid===t.id&&r.user===uid()&&r.status==='pending'))return fail('已有审批中的申请。');db.applications.push({id:key(),cid:c.id,tid:t.id,user:uid(),status:'pending',text:String(data.get('reason')||''),time:stamp()});message(t.leader,c,names(uid())+'申请加入「'+t.name+'」。');message(uid(),c,'申请已提交，等待队长审批。','我的申请');}save();close();render();toast('已保存，通知已同步。');},true);
- window.addEventListener('storage',e=>{if(e.key===storageKey){try{const latest=JSON.parse(e.newValue);if(latest?.participation){if(latest.participation.active!==uid()&&$('#competition-registration-form, [data-expert-profile-actor]'))close();Object.assign(db,latest.participation);render();}}catch{}}});
+window.addEventListener('storage',e=>{if(e.key===storageKey){try{const latest=JSON.parse(e.newValue);if(latest?.participation){if(latest.participation.active!==uid()&&$('#competition-registration-form, [data-expert-profile-actor], [data-op-confirm-register]'))close();Object.assign(db,latest.participation);render();}}catch{}}});
 setInterval(()=>{const c=find(currentId);if(c&&reg(c.id)&&locked(c)&&!reg(c.id).deadlineNotified)render();},15000);
-window.expertCenter={users,uid,names,db,save,notices,openRegistration,demoSettings:profile,unread:()=>db.messages.filter(m=>m.to===uid()&&!m.read).length+state.notices.filter(n=>(n.to||'rong')===uid()&&!n.read).length};
+window.expertCenter={users,uid,names,db,save,notices,openRegistration,requireResume,demoSettings:profile,unread:()=>db.messages.filter(m=>m.to===uid()&&!m.read).length+state.notices.filter(n=>(n.to||'rong')===uid()&&!n.read).length};
 render();
 })();

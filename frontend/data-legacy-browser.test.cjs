@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict');
 const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
-(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{
+(async()=>{const b=await chromium.launch({channel:process.env.BENCHSQUARE_BROWSER||'chrome',headless:true});try{
 const p=await b.newPage({viewport:{width:1600,height:1000}}),errors=[];p.setDefaultTimeout(10000);p.on('pageerror',e=>errors.push(e.message));
 const base=process.env.DEMO_BASE||'http://127.0.0.1:4173/frontend/';
 await p.goto(base+'#mine');await p.locator('[data-wb="demo"]').click();await p.locator('[data-dd-new]').waitFor();await p.getByRole('button',{name:'关闭提交面板'}).click();

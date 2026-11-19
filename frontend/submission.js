@@ -10,7 +10,7 @@
   const context=()=>W.context(W.read(),cid,tid,DEMO_COMPETITIONS);
   const actor=dashboard||scoped?context().user:null;
   const workspaceKey=dashboard?'dashboard:'+actor+':'+(params.get('item')||params.get('fresh')||'new'):scoped?teamWorkspaceKey+':'+actor:null;
-  const issue=(submit=false,targetId)=>{const target=store.records.find(r=>r.id===(targetId||editingId));if(DataItems.locked(target))return '当前数据已锁定，仅可查看详情、下载附件和查看历史记录；只有草稿或退回补正的数据可编辑。';if(dashboard){if(context().user!==actor||sessionStorage.getItem('expert-demo-out')==='yes')return '演示身份已变化，请重新进入。';if(!submit)return '';if(!cid)return '请先选择要提交的比赛。';return W.permission(context(),W.read().participation?.workbenchClock?.[cid],true);}if(!scoped)return '';if(!cid||!tid)return '比赛或团队信息不完整，请从比赛详情重新进入。';const x=context();if(x.user!==actor)return '演示身份已变化，请返回比赛详情重新进入。';return W.permission(x,W.read().participation?.workbenchClock?.[cid],submit,store.records.find(r=>r.id===(targetId||(location.hash.startsWith('#detail/')?location.hash.split('/')[1]:editingId))));};
+  const issue=(submit=false,targetId)=>{const target=store.records.find(r=>r.id===(targetId||editingId));if(DataItems.locked(target))return '当前数据已锁定，仅可查看详情、下载附件和查看历史记录；只有草稿或退回补正的数据可编辑。';if(dashboard){if(context().user!==actor||sessionStorage.getItem('expert-demo-out')==='yes')return '演示身份已变化，请重新进入。';if(!submit)return '';if(!cid)return '请先选择要提交的比赛。';return W.permission(context(),W.read().participation?.workbenchClock?.[cid],true,target);}if(!scoped)return '';if(!cid||!tid)return '比赛或团队信息不完整，请从比赛详情重新进入。';const x=context();if(x.user!==actor)return '演示身份已变化，请返回比赛详情重新进入。';return W.permission(x,W.read().participation?.workbenchClock?.[cid],submit,store.records.find(r=>r.id===(targetId||(location.hash.startsWith('#detail/')?location.hash.split('/')[1]:editingId))));};
   const visible=r=>dashboard?DataItems.owner(r,W.read())===actor:scoped?W.belongs(r,cid,tid)&&W.ownerOf(r,context().team)===actor:!r.competitionId;
   const S=r=>dashboard&&DataItems.status(r)==='草稿'?'草稿':W.taskStatus(r.status);
   const editable=r=>!DataItems.locked(r);
@@ -29,6 +29,11 @@
   let form=clone(store.work?.form||M.empty()), editingId=store.work?.id||null, baseline=store.work?.baseline||JSON.stringify(M.empty()), errors={}, busy=false, route=location.hash||'#new', skipGuard=false;
   const dirty=()=>JSON.stringify(form)!==baseline;
   function notice(message){$('#notice').textContent=message;$('#notice').classList.add('show');clearTimeout(notice.timer);notice.timer=setTimeout(()=>$('#notice').classList.remove('show'),4800);}
+  function deniedSubmission(message,submit){
+    notice(message);
+    const blocked=submit&&W.restriction(context());
+    if(blocked)window.EventContact.openAppeal(blocked);
+  }
   function persist(next){try{let latest=JSON.parse(localStorage.getItem(M.config.storageKey)||'null');if(latest?.records)latest=DataMocks.upgrade(latest);if(latest?.records&&JSON.stringify(latest.records.filter(visible).map(r=>({...r,form:M.normalize(r.form),...(r.draftForm?{draftForm:M.normalize(r.draftForm)}:{}),history:(r.history||[]).map(h=>({...h,...(h.form?{form:M.normalize(h.form)}:{})}))})))!==JSON.stringify(store.records.filter(visible))){notice('你的任务已在其他页面更新，请保留当前内容并刷新后继续。');return false;}if(latest?.records)next.records=[...latest.records.filter(r=>!visible(r)),...next.records.filter(visible)];if(!scoped&&!dashboard&&latest?.workspaces)next.workspaces=latest.workspaces;if(scoped||dashboard)next.workspaces={...(latest?.workspaces||store.workspaces),[workspaceKey]:next.work};localStorage.setItem(M.config.storageKey,JSON.stringify(scoped||dashboard?{...next,work:latest?.work||null}:next));store=next;return true;}catch{notice('浏览器存储不可用或已满，本次未保存。请保留页面后重试。');return false;}}
   function stash(){persist({...store,work:{id:editingId,form:clone(form),baseline,...(dashboard?{competitionId:cid}:{})}});updateProgress();}
   const date=s=>new Date(s).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});
@@ -93,17 +98,17 @@
   function list(){const records=store.records.filter(visible);return `<div class="breadcrumb">工作台 <span>/</span> ${recordLabel}</div><div class="page-heading"><div><span class="eyebrow">YOUR CONTRIBUTIONS</span><h1>${recordLabel}<span class="heading-dot">.</span></h1><p>每一个任务，都凝结着一份专业经验。</p></div>${btn('new','＋ 新建任务',true)}</div><div class="stats">${['全部任务','待初审','终检中','已通过'].map((s,i)=>`<div><span>${s}</span><strong>${i===0?records.length:records.filter(r=>S(r)===s).length}</strong></div>`).join('')}</div><div class="list-panel"><div class="list-toolbar"><h2>任务记录 <small>${records.length}</small></h2><label>状态 <select id="status-filter"><option>全部</option><option>草稿</option><option>待初审</option><option>终检中</option><option>需修改</option><option>已通过</option><option>未通过</option></select></label></div><div class="table-scroll"><table><thead><tr><th>任务名称</th><th>所属领域</th><th>更新时间（北京时间）</th><th>状态</th><th>操作</th></tr></thead><tbody id="record-rows"></tbody></table></div><div class="list-foot">提交后先进入人工初审，通过后进入终检；最终以平台确认结果为准。本地 Demo 不代表真实入库或审核。</div></div>`;}
   function rows(filter='全部'){const records=store.records.filter(visible).filter(r=>filter==='全部'||S(r)===filter).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));$('#record-rows').innerHTML=records.length?records.map(r=>`<tr><td><a href="#detail/${E(r.id)}">${E(r.form.name||'未命名草稿')}</a><small>${E(r.number||'草稿 · '+r.id)}${r.revision?' · 第 '+r.revision+' 次提交':''}</small></td><td>${E(r.form.domain||'未填写')}</td><td>${date(r.updatedAt)}</td><td><span class="badge ${r.status==='草稿'?'draft':''}">${S(r)}</span>${r.draftForm?'<small>有修改草稿</small>':''}</td><td><a href="#detail/${E(r.id)}">查看详情 →</a></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty-state"><span>▤</span><h3>${filter==='全部'?'还没有提交记录':'没有该状态的记录'}</h3><p>保存草稿或提交第一个任务，从这里继续。</p>${btn('new','开始填写任务',true)}</div></td></tr>`;}
   function detail(id){const r=store.records.find(r=>r.id===id&&visible(r));if(!r)return `<div class="empty-state"><h1>未找到本地记录</h1><a href="#list">返回我的提交</a></div>`;return `<div class="breadcrumb"><a href="#list">${recordLabel}</a><span>/</span> 任务详情</div><div class="page-heading"><div><span class="eyebrow">TASK DETAILS</span><h1>${E(r.form.name||'未命名草稿')}</h1><p>${E(r.number||'草稿 · '+r.id)} · 更新于 ${date(r.updatedAt)}</p></div>${!issue(false,r.id)&&editable(r)?btn('edit:'+r.id,S(r)==='草稿'?'继续编辑':r.draftForm?'继续修改草稿':'修改并重提'):''}</div><div class="detail-meta"><span class="badge ${r.status==='草稿'?'draft':''}">${dashboard?DataItems.label(r):r.status}</span><span>${dashboard&&!r.competitionId?'尚未向比赛提交':r.revision?'第 '+r.revision+' 次提交':'尚未提交'}</span><span>本地 Demo · 初审通过后进入终检</span></div>${M.unavailable(r.form,files).length?'<div class="warning">附件仅保留文件名等元信息，实际文件在当前会话不可用。修改重提时请重新选择或删除。</div>':''}${dashboard&&!r.competitionId?'<div class="warning">此记录尚未关联比赛，当前按草稿管理。旧版演示的编号和历史记录仅作留档，不代表已向比赛提交。请继续编辑，选择比赛后提交审核。</div>':''}${DataItems.locked(r)?'<div class="info">当前数据为只读状态，可查看详情、下载附件和查看历史记录；只有草稿或退回补正的数据可编辑。</div>':''}${r.status==='草稿'||r.draftForm&&!DataItems.locked(r)?`<section class="history draft-package"><h3>${r.revision?'未提交的修改草稿':'草稿文件'}</h3>${preview(DataItems.form(r))}</section>`:''}${submissionHistory(r)}`;}
-  function submissionHistory(r){
-    const versions=DataItems.timeline(r);
-    return versions.length?`<section class="submission-history" aria-label="提交与审核记录"><h3>提交与审核记录</h3><p class="hint">每次提交的内容与该版本的审核记录一一对应。</p>${versions.map(h=>{
-      const ale=h.form&&M.format(h.form)==='question';
-      return `<details class="submission-version" data-revision="${h.revision}" ${h.current?'open':''}>
-        <summary class="version-header"><div class="version-summary-main"><div class="version-title"><strong>v${h.revision} · 第 ${h.revision} 次提交</strong>${h.current?'<span class="version-current">当前提交版本</span>':''}</div><p>${h.at?date(h.at):'提交时间未记录'}${h.by?' · '+E(h.by):''}</p>${h.number?'<small>'+E(h.number)+'</small>':''}</div><svg class="version-chevron" aria-hidden="true" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg></summary>
-        <div class="version-package detail-content">${h.form?(ale?submissionPreviewCard(r,h):preview(h.form)):'<p class="hint">此版本暂无文件快照。</p>'}</div>
-        <div class="version-reviews">${h.reviews.length?h.reviews.map(review=>`<div class="version-review ${review.to==='需修改'?'version-correction':''}"><div class="version-review-heading"><strong>${E(({'需修改':'需补正','未通过':'审核不通过','已通过':'已录用','已审核':'审核通过','终检中':'初审通过 · 终检中'})[review.to]||review.to)}</strong><span>${review.at?date(review.at):''}${review.by?' · '+E(review.by):''}</span></div><p class="review-message-content">${E(review.note||'暂无具体审核意见。')}</p>${['已审核','已通过','已录用'].includes(review.to)?'<div class="review-final-score"><span>最终得分</span><strong>'+(DataItems.validScore(review.score)?review.score.toFixed(2)+'<small>分</small>':'历史记录缺少得分')+'</strong></div>':''}</div>`).join(''):`<p class="version-pending">${h.current?(['待初审','终检中'].includes(S(r))?'本版本审核中，结果出具后将在这里展示。':DataItems.reviewInfo(r).note?E(DataItems.reviewInfo(r).note):'本版本暂无审核记录。'):'此版本未记录审核意见。'}</p>`}</div>
-        ${h.form&&!ale?`<button class="btn version-preview" data-do="history:${E(r.id)}:${h.revision}">查看此版本</button>`:''}
-      </details>`;
-    }).join('')}</section>`:'';
+  function submissionHistory(record){
+    return TaskDetailView.renderHistory(record,{
+      collapsible:true,
+      status:S,
+      date,
+      renderForm:(form,version)=>M.format(form)==='question'?submissionPreviewCard(record,version):preview(form),
+      previewButton:(r,version)=>M.format(version.form)==='question'?'':`<button type="button" class="btn version-preview" data-do="history:${E(r.id)}:${version.revision}">查看此版本</button>`,
+      renderScore:review=>['已审核','已通过','已录用'].includes(review.to)
+        ?'<div class="review-final-score"><span>最终得分</span><strong>'+(DataItems.validScore(review.score)?review.score.toFixed(2)+'<small>分</small>':'历史记录缺少得分')+'</strong></div>'
+        :''
+    });
   }
   let stepFrame=0;
   function updateActiveStep(){
@@ -131,8 +136,20 @@
     return result==='saved';
   }
   function go(hash){skipGuard=true;location.hash=hash;if(location.hash===route){skipGuard=false;render();}window.scrollTo(0,0);}
-  async function save(submit=false){if(busy)return;const denied=issue(submit);if(denied){notice(denied);return;}if(editingId&&!store.records.some(r=>r.id===editingId&&visible(r)&&editable(r))){notice('该任务不属于当前参赛者，请返回工作台重新进入。');return;}if(submit){errors=M.validate(form,files);showErrors();if(Object.keys(errors).length){$('#f-'+Object.keys(errors)[0])?.focus();notice(M.format(form)==='question'?'请检查必填字段并完成提交确认。':'请检查压缩包并完成提交确认和诚信承诺。');return;}}busy=true;document.querySelectorAll('[data-do="submit"],[data-do="save"]').forEach(b=>b.disabled=true);
+  async function save(submit=false){if(busy)return;const denied=issue(submit);if(denied){deniedSubmission(denied,submit);return;}if(editingId&&!store.records.some(r=>r.id===editingId&&visible(r)&&editable(r))){notice('该任务不属于当前参赛者，请返回工作台重新进入。');return;}if(submit){
+      const otherTasks=store.records.filter(r=>r.id!==editingId&&visible(r)&&(r.competitionId||'')===cid&&M.format(r.form)==='question');
+      errors=M.validate(form,files,otherTasks);showErrors();if(Object.keys(errors).length){$('#f-'+Object.keys(errors)[0])?.focus();notice(M.format(form)==='question'?'请检查必填字段并完成提交确认。':'请检查压缩包并勾选诚信承诺。');return;}}busy=true;document.querySelectorAll('[data-do="submit"],[data-do="save"]').forEach(b=>b.disabled=true);
     if(dashboard){try{await DataFiles.put(actor,[...files.entries()].filter(([id])=>(submit?M.activeAttachments(form):form.attachments).some(a=>a.id===id&&a.source==='file')));}catch{busy=false;document.querySelectorAll('[data-do="save"]').forEach(b=>b.disabled=false);syncSubmit();notice('附件保存失败：浏览器空间不足或存储不可用。请保留页面并重新选择较小的压缩包。');return;}}
+    if(submit){
+      const freshDenied=issue(true);
+      if(freshDenied){
+        busy=false;
+        document.querySelectorAll('[data-do="save"]').forEach(b=>b.disabled=false);
+        syncSubmit();
+        deniedSubmission(freshDenied,true);
+        return;
+      }
+    }
     const submittedForm=submit?M.forSubmission(form):clone(form);
     const previous=store.records.find(r=>r.id===editingId&&visible(r)),now=new Date().toISOString(),id=editingId||crypto.randomUUID(),rev=(previous?.revision||0)+(submit?1:0),number=submit?'BS-'+new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}).replaceAll('-','')+'-'+crypto.randomUUID().slice(0,8).toUpperCase():previous?.number;
     const record={id,createdAt:previous?.createdAt||now,...(previous?.mock?{mock:true,mockVersion:previous.mockVersion||DataMocks.version}:{}),form:submittedForm,updatedAt:now,status:submit?'待初审':'草稿',revision:rev,number,reviews:previous?.reviews||[],reviewNote:submit?'':previous?.reviewNote||'',history:[...(previous?.history||[]),...(submit?[{revision:rev,number,at:now,name:submittedForm.name,form:clone(submittedForm),by:actor||'独立演示用户'}]:[])]};if(scoped||dashboard)Object.assign(record,{...(cid?{competitionId:cid,teamId:tid}:{}),ownerId:dashboard?actor:previous?W.ownerOf(previous,context().team):actor,updatedBy:actor});if(!submit&&previous&&previous.status!=='草稿'){record.form=previous.form;record.status=previous.status;if(previous.reviewOutcome)record.reviewOutcome=previous.reviewOutcome;record.draftForm=clone(form);}const next={...store,records:[...store.records.filter(r=>r.id!==id),record],work:submit?null:{id,form:clone(form),baseline:JSON.stringify(form),...(dashboard?{competitionId:cid}:{})}};

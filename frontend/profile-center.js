@@ -2,6 +2,8 @@
 (() => {
 const api=window.expertCenter;
 const identity=window.CompetitionIdentity;
+const resumes=window.ResumeFiles;
+const verificationContinuations=new WeakMap();
 api.db.profiles ||= {};
 api.db.accounts ||= {};
 let anchor=null;
@@ -21,20 +23,23 @@ function verificationAttributes(competitionId,registration){
 }
 
 function registrationState(element){
+ const onVerified=verificationContinuations.get(element);
+ if(onVerified)return {onVerified};
  return element.hasAttribute('data-from-registration')?{rulesAccepted:element.hasAttribute('data-rules-accepted')}:null;
 }
 
-function openProfile({competitionId='',verifyAfterLogin=false,registration=null}={}){
+function openProfile({competitionId='',verifyAfterLogin=false,registration=null,resumeAfterLogin=false}={}){
  if(sessionStorage.getItem('expert-demo-out')==='yes'){
-  const context=`data-profile-login ${verifyAfterLogin?'data-verify':''} ${verificationAttributes(competitionId,registration)}`;
+  const context=`data-profile-login ${verifyAfterLogin?'data-verify':''} ${resumeAfterLogin?'data-resume-login':''} ${verificationAttributes(competitionId,registration)}`;
   show(`<div class="expert-profile"><h2 id="expert-profile-dialog-title" tabindex="-1">个人资料</h2>
    <p>请登录演示身份后查看个人资料。</p>${button('login','使用演示身份登录',context)}</div>`);
+  if(typeof registration?.onVerified==='function')verificationContinuations.set($('[data-profile-login]'),registration.onVerified);
   $('#expert-profile-dialog-title').focus();
   return;
  }
  const user=api.uid(),p=get(user),verified=Boolean(identity.verifiedAt(api.db,user));
  const profileDetails=[p.field,p.title,p.organization].filter(Boolean).join(' · ');
- const description=verified?'你的账号已通过实名认证，可以报名平台赛事。':competitionId?'请先完成实名认证，再报名赛事。':'完成一次实名认证后，即可报名平台赛事。';
+ const description=verified?'你的账号已通过实名认证。':'平台赛事报名需要完成实名认证。';
  show(`<div class="expert-profile" data-expert-profile-actor="${esc(user)}">
   <h2 id="expert-profile-dialog-title" tabindex="-1">个人资料</h2>
   <p class="expert-profile-name">${esc(p.name)}</p>
@@ -47,6 +52,14 @@ function openProfile({competitionId='',verifyAfterLogin=false,registration=null}
     <p>${description}</p>
     ${verified?'':`<div class="expert-form-actions"><button type="button" class="button dark" data-expert="profile-verify" data-competition="${esc(competitionId)}">开始实名认证</button></div>`}
    </section>
+   <section class="panel" aria-labelledby="profile-resume-title">
+    <div class="expert-identity-heading">
+     <h3 id="profile-resume-title">参赛简历</h3>
+     <span class="badge" data-resume-status role="status">读取中</span>
+    </div>
+    <p class="expert-resume-filename" data-resume-filename>报名比赛前需上传简历。</p>
+    <div class="expert-form-actions">${button('profile-resume','上传简历')}</div>
+   </section>
    <section class="panel" aria-labelledby="profile-card-title">
     <h3 id="profile-card-title">专家名片</h3>
     ${profileDetails?`<p>${esc(profileDetails)}</p>`:''}
@@ -55,12 +68,114 @@ function openProfile({competitionId='',verifyAfterLogin=false,registration=null}
   </div>
  </div>`);
  $('#expert-profile-dialog-title').focus();
+ const resumePanel=$('#profile-resume-title').closest('section');
+ resumes.get(user).then(record=>{
+  if(!resumeViewActive(resumePanel,user))return;
+  showResumeStatus(resumePanel,record,'报名比赛前需上传简历。');
+  if(record)resumePanel.querySelector('[data-expert="profile-resume"]').textContent='更换简历';
+ }).catch(()=>{
+  if(resumeViewActive(resumePanel,user))resumePanel.querySelector('[data-resume-status]').textContent='读取失败';
+ });
+}
+
+function resumeViewActive(view,user){
+ return view.isConnected&&$('#dialog').open&&api.uid()===user&&sessionStorage.getItem('expert-demo-out')!=='yes';
+}
+
+function showResumeStatus(view,record,emptyMessage){
+ const badge=view.querySelector('[data-resume-status]');
+ badge.classList.toggle('green',Boolean(record));
+ badge.classList.toggle('orange',!record);
+ badge.textContent=record?'已上传':'未上传';
+ view.querySelector('[data-resume-filename]').textContent=record?.file.name||emptyMessage;
+}
+
+async function openResume({onContinue}={}){
+ if(sessionStorage.getItem('expert-demo-out')==='yes')return openProfile({resumeAfterLogin:true});
+ const user=api.uid(),fromRegistration=typeof onContinue==='function';
+ show(`<div class="expert-resume" data-expert-profile-actor="${esc(user)}">
+  ${fromRegistration?'':'<button type="button" class="text-link expert-verification-back" data-expert="profile-page"><span aria-hidden="true">←</span> 返回个人资料</button>'}
+  <h2 id="expert-resume-title" tabindex="-1">上传简历</h2>
+  <p>${fromRegistration?'报名比赛前需上传简历。上传后可以继续本次报名。':'上传后的简历可用于后续比赛报名。'}</p>
+  <div class="expert-resume-current">
+   <span class="badge" data-resume-status role="status">读取中</span>
+   <span class="expert-resume-filename" data-resume-filename></span>
+  </div>
+  <form id="expert-resume-form">
+   <fieldset disabled>
+    <label class="field">简历文件
+     <input type="file" name="resume" accept=".pdf,.doc,.docx" required aria-describedby="expert-resume-formats expert-resume-error">
+    </label>
+    <p class="expert-resume-hint" id="expert-resume-formats">支持 PDF、DOC、DOCX，文件最大 10 MB。</p>
+    <p class="error" id="expert-resume-error" role="alert"></p>
+    <p class="expert-resume-feedback" role="status"></p>
+    <div class="expert-form-actions">
+     ${fromRegistration?'<button class="button dark" type="button" data-resume-continue hidden>继续报名</button>':''}
+     <button class="button dark" type="submit">上传简历</button>
+    </div>
+   </fieldset>
+  </form>
+  <p class="expert-card-note">当前演示将简历保存在此浏览器中。</p>
+ </div>`);
+ const form=$('#expert-resume-form'),view=form.closest('.expert-resume');
+ const fields=form.querySelector('fieldset'),input=form.elements.resume;
+ const error=form.querySelector('.error'),feedback=form.querySelector('.expert-resume-feedback');
+ const submit=form.querySelector('[type="submit"]'),continueButton=form.querySelector('[data-resume-continue]');
+ const active=()=>resumeViewActive(view,user);
+ function display(record){
+  showResumeStatus(view,record,'');
+  submit.textContent=record?'保存新简历':'上传简历';
+  if(continueButton){
+   continueButton.hidden=!record;
+   submit.classList.toggle('dark',!record);
+  }
+ }
+ $('#expert-resume-title').focus();
+ continueButton?.addEventListener('click',()=>{if(active())onContinue();});
+ input.addEventListener('change',()=>{
+  error.textContent='';
+  feedback.textContent='';
+  input.removeAttribute('aria-invalid');
+ });
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(fields.disabled||!active())return;
+  fields.disabled=true;
+  error.textContent='';
+  input.removeAttribute('aria-invalid');
+  feedback.textContent='正在上传简历…';
+  try{
+   const record=await resumes.save(user,input.files[0]);
+   if(!active())return;
+   display(record);
+   form.reset();
+   feedback.textContent='简历已上传。';
+  }catch(err){
+   if(!active())return;
+   feedback.textContent='';
+   error.textContent=err?.message||'简历上传失败，请重试。';
+   input.setAttribute('aria-invalid','true');
+  }finally{
+   fields.disabled=false;
+  }
+  if(continueButton&&!continueButton.hidden&&!error.textContent)continueButton.focus();
+ });
+ try{
+  const record=await resumes.get(user);
+  if(active())display(record);
+ }catch{
+  if(active())view.querySelector('[data-resume-status]').textContent='读取失败';
+ }finally{
+  fields.disabled=false;
+ }
 }
 
 function openVerification(competitionId='',registration=null){
  if(sessionStorage.getItem('expert-demo-out')==='yes')return openProfile({competitionId,verifyAfterLogin:true,registration});
  const user=api.uid();
+ const onVerified=typeof registration?.onVerified==='function'?registration.onVerified:null;
  if(identity.verifiedAt(api.db,user)){
+  if(onVerified)return onVerified();
   return registration?api.openRegistration(find(competitionId),registration.rulesAccepted):openProfile({competitionId});
  }
  const context=verificationAttributes(competitionId,registration);
@@ -74,16 +189,18 @@ function openVerification(competitionId='',registration=null){
    <button class="button dark" type="submit">立即核验</button>
   </form>
  </div>`);
+ if(onVerified)verificationContinuations.set($('#expert-identity-form'),onVerified);
  $('#expert-verification-title').focus();
 }
 
 function finishIdentity(form){
  const competition=find(form.dataset.competition),registration=registrationState(form);
+ if(registration?.onVerified)return registration.onVerified();
  if(registration)return api.openRegistration(competition,registration.rulesAccepted);
  if(competition){
   close();
   go('#competition/'+competition.id);
-  toast('实名认证已通过，可以继续报名。');
+  toast('实名认证已通过。');
   $('#main .detail-heading [data-action="register"], #main .detail-heading [data-action="team"]')?.focus({preventScroll:true});
  }else openProfile();
 }
@@ -119,6 +236,7 @@ document.addEventListener('submit',e=>{
 },true);
 $('#dialog').addEventListener('close',()=>{if(!$('#dialog').open)$('#expert-identity-form')?.reset();});
 window.expertProfile={openVerification};
+api.openResume=openResume;
 
 function restoreProfileLink(){
  const [root,section,id]=location.hash.slice(1).split('/');
@@ -127,6 +245,7 @@ function restoreProfileLink(){
  history.replaceState(null,'',competition?'#competition/'+competition.id:'#discover');
  render();
  if(verify)openVerification(competition?.id);
+ else if(section==='resume')openResume();
  else openProfile();
 }
 
@@ -144,9 +263,11 @@ window.addEventListener('click',e=>{
  switch(action){
   case 'profile-page':openProfile();break;
   case 'profile-verify':openVerification(b.dataset.competition);break;
+  case 'profile-resume':openResume();break;
   case 'profile-back':{
-   const registration=registrationState(b);
-   if(registration)api.openRegistration(find(b.dataset.competition),registration.rulesAccepted);
+   const registration=registrationState($('#expert-identity-form'));
+   if(registration?.onVerified)close();
+   else if(registration)api.openRegistration(find(b.dataset.competition),registration.rulesAccepted);
    else openProfile({competitionId:b.dataset.competition});
    break;
   }
@@ -167,6 +288,7 @@ window.addEventListener('click',e=>{
    sessionStorage.removeItem('expert-demo-out');
    render();
    if(b.hasAttribute('data-verify'))openVerification(b.dataset.competition,registrationState(b));
+   else if(b.hasAttribute('data-resume-login'))openResume();
    else if(b.hasAttribute('data-profile-login'))openProfile({competitionId:b.dataset.competition});
    else toast('已进入演示身份');
    break;

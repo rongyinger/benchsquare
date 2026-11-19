@@ -43,7 +43,7 @@
 
   function seedDemo(){
     const existing=state.competitions.find(c=>c.id===demoId);
-    const description='体验赛事报名与组队。首次报名时可前往个人资料完成实名认证。';
+    const description='体验赛事报名与组队。请先在个人资料完成实名认证并上传简历。';
     if(existing)existing.values.description=description;
     const now=Date.now();
     if(existing&&(Date.parse(existing.values.registrationEnd)>now||Object.keys(state.participation.regs[demoId]||{}).length))return;

@@ -14,12 +14,26 @@ assert.equal(W.permission(late,'real',true,{status:'需修改'}),'');
 assert.match(W.permission(late,'real',true,null),/已截止/);
 late.competition.values.correctionEnd='';assert.match(W.permission(late,'real',true,{status:'需修改'}),/未公布/);
 assert.equal(W.taskStatus('已提交'),'待初审');assert.equal(W.taskStatus('待质检'),'待初审');
+// A team restriction covers every member and every formal submission, while drafts remain available.
+s.participation.teams[0].blacklisted=true;s.participation.teams[0].blacklistReason='材料来源待核查';
+for(const user of ['leader','member']){
+ s.participation.active=user;const blocked=W.context(s,'c','t');
+ assert.equal(W.restriction(blocked).reason,'材料来源待核查');
+ assert.match(W.permission(blocked,'open',true),/已被拉黑.*企业微信申诉/);
+ assert.match(W.permission({...late,team:blocked.team},'open',true,{status:'需修改'}),/已被拉黑/);
+ assert.equal(W.permission(blocked,'open',false),'','blacklisted teams retain draft access');
+}
+assert.equal(W.restriction({...x,competition:{id:'other'}}),null,'restriction is scoped to its competition');
+assert.equal(W.restriction(W.context(s,'c','missing')),null);
+s.participation.teams[0].blacklisted=false;
+assert.equal(W.permission(W.context(s,'c','t'),'open',true),'','unblocking restores original permission checks');
 const other={...c,id:'other',values:{identityVerification:'实名认证'}};
 s.competitions.push(other);
 c.values={identityVerification:'实名认证'};
 s.participation.regs.other={leader:{identityAttempts:[{review:{status:'approved',at:Date.now()}}]}};
 s.participation.teams.push({id:'other-team',cid:'other',leader:'leader',members:['leader']});
 assert.match(W.permission(W.context(s,'c','t'),'open',true),/个人资料完成实名认证/);
+s.participation.active='leader';
 assert.equal(W.permission(W.context(s,'other','other-team'),'open',true),'');
 s.participation.regs.c.leader.identityAttempts=[{review:{status:'returned'}},{}];
 assert.match(W.permission(W.context(s,'c','t'),'open',true),/个人资料完成实名认证/);

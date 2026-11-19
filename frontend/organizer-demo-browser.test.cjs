@@ -1,0 +1,387 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const crypto=require('node:crypto');
+const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
+(async()=>{
+  const browser=await chromium.launch({channel:process.env.BENCHSQUARE_BROWSER||'chrome',headless:true});
+  const context=await browser.newContext({viewport:{width:1600,height:1100},acceptDownloads:true});
+  const page=await context.newPage(),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  const base=process.env.DEMO_BASE||'http://127.0.0.1:4173/frontend/';
+  const output=process.env.BENCHSQUARE_QA_OUTPUT||'/private/tmp/organizer-demo-qa';
+  fs.mkdirSync(output,{recursive:true});
+  const liveOutput=process.env.BENCHSQUARE_PRD_SHOTS||output+'/prd-live';
+  fs.mkdirSync(liveOutput,{recursive:true});
+  const liveShot=async(name,selector='')=>{
+    await page.locator('#toast:not(.show)').waitFor({state:'attached'});
+    await page.evaluate(()=>{window.scrollTo(0,0);return document.fonts.ready;});
+    if(selector)await page.locator(selector).evaluate(el=>el.scrollTo(0,0));
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await (selector?page.locator(selector):page).screenshot({path:liveOutput+'/'+name+'.png',animations:'disabled',...(!selector?{fullPage:true}:{})});
+  };
+  const read=(id='organizer-mock-event')=>page.evaluate(event=>OrganizerDemoStore.read(event),id);
+  const clickMetric=id=>page.locator('[data-od="metric"][data-od-filter="'+id+'"]').click();
+  const teamRows=()=>page.locator('#od-results tbody tr');
+  const gotoTeams=async(event='organizer-mock-event')=>{await page.goto(base+'#organizer-teams/'+event);await page.locator('.od-breadcrumb a[href="#organizer-teams/'+event+'"]').waitFor();await page.locator('#od-results').waitFor();};
+  const gotoTeam=async(id='T-001',event='organizer-mock-event')=>{await page.goto(base+'#organizer-teams/'+event+'/'+id);await page.locator('.od-breadcrumb a[href="#organizer-teams/'+event+'"]').waitFor();await page.locator('.od-heading p').filter({hasText:id}).waitFor();await page.locator('.od-team-summary').waitFor();};
+  const setBlock=async(blocked,reason)=>{
+    await page.locator('[data-od="'+(blocked?'block':'unblock')+'"]').click();
+    await page.locator('#od-block-form textarea').fill(reason);
+    await page.locator('#od-block-form button[type="submit"]').click();
+    await page.locator('#od-block-form').waitFor({state:'hidden'});
+  };
+  const simulate=async(kind)=>{
+    await page.locator('[data-od="simulate"][data-kind="'+kind+'"]').click();
+    if(await page.locator('#event-contact-dialog[open]').count()){
+      assert.match(await page.locator('#event-contact-dialog').innerText(),/已被拉黑[\s\S]*企业微信申诉/);
+      await page.locator('[data-event-contact-close]').first().click();
+    }
+    return page.locator('#od-simulation-result').innerText();
+  };
+  try{
+    await page.goto(base+'#organizer');
+    await page.locator('.oc-management tbody').first().waitFor();
+    assert.equal(await page.locator('.od-entry').count(),0,'events appear directly without a separate entry banner');
+    assert.equal(await page.locator('.oc-management tbody tr').count(),8);
+    assert.equal(await page.locator('.oc-management [data-oc-group="published"] tbody tr').count(),5);
+    assert.equal(await page.locator('.oc-management [data-oc-group="unpublished"] tbody tr').count(),3);
+    assert.ok(!(await page.locator('.oc-management th').allTextContents()).includes('操作'));
+    const groupGap=await page.evaluate(()=>document.querySelector('[data-oc-group="unpublished"]').getBoundingClientRect().top-document.querySelector('[data-oc-group="published"]').getBoundingClientRect().bottom);
+    assert.ok(groupGap>=32,'published and pending sections have a visible gap');
+    const examples=[
+      ['organizer-mock-event','已发布','进行中',8,16],
+      ['od-chart','已发布','报名中',5,0],
+      ['od-code','已发布','待开赛',4,0],
+      ['od-science','已发布','审核补正中',6,12],
+      ['od-finance','已发布','已结束',7,14],
+      ['od-law','审核中','未上线',0,0],
+      ['od-medical','待付款','未上线',0,0],
+      ['od-draft','草稿','未上线',0,0]
+    ];
+    for(const [id,stage,phase,teams,tasks] of examples){
+      const row=page.locator('.oc-management tr[data-oc-row="'+id+'"]');
+      assert.equal((await row.locator('td').nth(1).innerText()).trim(),stage);
+      assert.equal((await row.locator('td').nth(2).innerText()).trim(),phase);
+      assert.match(await row.locator('td').nth(3).innerText(),new RegExp(teams+' 支团队'));
+      assert.equal((await row.locator('td').nth(4).innerText()).trim(),String(tasks));
+      assert.equal(await row.locator('a[href="#organizer-teams/'+id+'"]').count(),stage==='已发布'?1:0);
+      assert.equal(await row.locator('a[href="#competition/'+id+'"]').count(),stage==='已发布'?1:0);
+      assert.equal(await row.locator('[data-oc="progress"]').count(),stage==='已发布'?0:1);
+    }
+    await page.screenshot({path:output+'/center-desktop.png',fullPage:true});
+    await page.locator('#oc-stage').selectOption('已发布');assert.equal(await page.locator('.oc-management tbody tr').count(),5);
+    assert.equal(await page.locator('.oc-management [data-oc-group="unpublished"]').count(),0);
+    await page.locator('#oc-phase').selectOption('报名中');assert.equal(await page.locator('.oc-management tbody tr').count(),1);
+    assert.equal(await page.locator('.oc-management tbody tr').getAttribute('data-oc-row'),'od-chart');
+    await page.locator('[data-oc="clear"]').first().click();
+    await page.locator('#oc-search').fill('法律');assert.equal(await page.locator('.oc-management tbody tr').count(),1);
+    await page.locator('#oc-search').fill('不存在的赛事');assert.equal(await page.locator('.oc-management tbody tr').count(),0);
+    await page.locator('[data-oc="clear"]').first().click();
+    for(const [id,stage] of examples.slice(5)){
+      await page.locator('[data-oc="progress"][data-oc-event="'+id+'"]').click();
+      const current=({草稿:0,审核中:1,待付款:2})[stage];
+      assert.deepEqual(await page.locator('.oc-release-steps li strong').allTextContents(),['完善方案','平台审核','奖金托管','上线确认','发布成功']);
+      assert.equal(await page.locator('.oc-release-steps [aria-current="step"]').getAttribute('data-oc-step'),String(current));
+      assert.equal(await page.locator('.oc-release-steps li[data-state="done"]').count(),current);
+      assert.equal(await page.locator('.oc-release-track').getAttribute('aria-valuenow'),String(current));
+      assert.match(await page.locator('#dialog-content').innerText(),new RegExp(stage));
+      assert.doesNotMatch(await page.locator('#dialog-content').innerText(),/报名开始|任务提交开始|结果公示/);
+      assert.equal(await page.locator('#dialog-content a[href^="#organizer-teams/"]').count(),0);
+      await page.locator('#dialog-content [data-action="close"]').click();
+      await page.goto(base+'#organizer-teams/'+id);
+      assert.match(await page.locator('.od-empty').innerText(),/尚未上线/);
+      assert.equal(await page.locator('[data-od="block"]').count(),0);
+      await page.goto(base+'#competition/'+id);await page.locator('.op-unpublished').waitFor();
+      assert.equal(await page.locator('.op-home').count(),0);
+      await page.goto(base+'#organizer');await page.locator('.oc-management tbody').first().waitFor();
+    }
+    for(const [id] of examples.slice(0,5)){
+      const row=page.locator('.oc-management tr[data-oc-row="'+id+'"]');
+      const name=(await row.locator('.oc-manage-link').innerText()).replace(/\s*→$/,'').trim();
+      await row.locator('.oc-home-link').click();
+      await page.locator('.op-home[data-op-event="'+id+'"]').waitFor();
+      assert.equal(new URL(page.url()).hash,'#competition/'+id);
+      assert.equal(await page.locator('.op-home h1').innerText(),name);
+      assert.equal(await page.locator('#dialog').evaluate(el=>el.open),false,'event info navigates without opening a modal');
+      assert.equal(await page.locator('a.op-manage').getAttribute('href'),'#organizer-teams/'+id);
+      await page.locator('a.op-back').click();await page.locator('.oc-management tbody').first().waitFor();
+      await page.locator('.oc-management tr[data-oc-row="'+id+'"] .oc-manage-link').click();
+      await page.locator('.od-breadcrumb a[href="#organizer-teams/'+id+'"]').waitFor();
+      assert.equal(new URL(page.url()).hash,'#organizer-teams/'+id);
+      await page.goto(base+'#organizer');await page.locator('.oc-management tbody').first().waitFor();
+    }
+    await page.goto(base+'#competition/od-chart');
+    const organizerRegistration=page.locator('[data-op-register="od-chart"]');
+    await organizerRegistration.click();
+    const identityForm=page.locator('#expert-identity-form');
+    await identityForm.locator('[name="realName"]').fill('演示用户');
+    await identityForm.locator('[name="idNumber"]').fill('000000200001010010');
+    await identityForm.locator('button[type="submit"]').click();
+    const resumeForm=page.locator('#expert-resume-form');
+    await resumeForm.waitFor();
+    assert.equal((await read('od-chart')).participantRegistration,undefined);
+    await resumeForm.locator('[name="resume"]').setInputFiles({name:'resume.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\n%%EOF')});
+    await resumeForm.locator('button[type="submit"]').click();
+    await resumeForm.locator('[data-resume-continue]').click();
+    await page.locator('#op-registration-rules').check();
+    await page.locator('[data-op-confirm-register="od-chart"]').click();
+    const registrationGroup=page.locator('#event-contact-dialog[open]');
+    await registrationGroup.waitFor();
+    assert.match(await registrationGroup.innerText(),/报名成功/);
+    assert.equal((await read('od-chart')).participantRegistration.userId,'rong');
+    await registrationGroup.locator('[data-event-contact-close]').first().click();
+    await page.goto(base+'#organizer');await page.locator('.oc-management tbody').first().waitFor();
+    await page.locator('[data-organizer-tab="data"]').click();
+    assert.equal(await page.locator('.oc-overview tbody tr').count(),8);
+    assert.ok(!(await page.locator('.oc-overview th').allTextContents()).includes('操作'));
+    assert.equal(await page.locator('.oc-overview [data-oc-group]').count(),2);
+    assert.equal((await page.locator('.oc-overview-summary strong').first().textContent()).trim(),'42条');
+    await page.screenshot({path:output+'/center-overview.png',fullPage:true});
+    await page.locator('[data-organizer-tab="manage"]').click();
+    await page.locator('.oc-management tr[data-oc-row="organizer-mock-event"] a[href="#organizer-teams/organizer-mock-event"]').last().click();
+    await page.locator('#od-results tbody').waitFor();
+    // Each published event owns its teams, filters, simulator and operation state.
+    for(const [id,,phase,count,tasks] of examples.slice(0,5)){
+      await gotoTeams(id);
+      assert.equal(await teamRows().count(),count);
+      assert.equal((await read(id)).tasks.length,tasks);
+      assert.match(await page.locator('.od-heading').innerText(),new RegExp(phase));
+    }
+    await gotoTeams('od-chart');
+    await page.locator('#od-search').fill('图谱');assert.equal(await teamRows().count(),1);
+    await gotoTeams('od-code');assert.equal(await page.locator('#od-search').inputValue(),'');assert.equal(await teamRows().count(),4);
+    await gotoTeams('od-chart');assert.equal(await page.locator('#od-search').inputValue(),'图谱');assert.equal(await teamRows().count(),1);
+    await page.locator('[data-od="clear"]').first().click();
+    await gotoTeam('T-001','od-chart');
+    for(const kind of ['new','correction'])assert.match(await simulate(kind),/已拒绝[\s\S]*尚未开始/);
+    await page.locator('#od-phase').selectOption('closed');
+    await setBlock(true,'只限制图表赛事，不影响其他场次。');
+    assert.equal((await read('od-chart')).teams[0].blacklisted,true);
+    assert.equal((await read()).teams[0].blacklisted,false);
+    await gotoTeam('T-001','od-code');
+    assert.equal(await page.locator('#od-phase').inputValue(),'open','simulator choices are scoped by event');
+    assert.equal((await read('od-code')).teams[0].blacklisted,false);
+    assert.match(await simulate('new'),/已拒绝[\s\S]*尚未开始/);
+    await gotoTeam('T-001','od-chart');assert.equal(await page.locator('#od-phase').inputValue(),'closed');
+    assert.match(await simulate('new'),/已拒绝[\s\S]*限制提交/);
+    await gotoTeam('T-001','od-science');
+    assert.match(await simulate('new'),/已拒绝[\s\S]*仅接受[\s\S]*补正/);
+    await page.locator('#od-member').selectOption('T-001-member-2');assert.match(await simulate('correction'),/校验通过/);
+    await page.locator('[data-od="task"]').first().click();
+    assert.match(await page.locator('#dialog-content h2').innerText(),/材料强度边界验证/);
+    await page.locator('[data-od="close-dialog"]').click();
+    await page.getByRole('link',{name:'返回团队列表',exact:true}).click();
+    assert.equal(new URL(page.url()).hash,'#organizer-teams/od-science');
+    await gotoTeam('T-001','od-finance');
+    for(const kind of ['new','correction'])assert.match(await simulate(kind),/已拒绝[\s\S]*已结束/);
+    await gotoTeams();
+    assert.equal(await teamRows().count(),8);
+    assert.deepEqual(await page.locator('.od-metric strong').allTextContents(),['8支团队','6支团队','2支团队','1支团队']);
+    assert.equal((await read()).tasks.length,16);
+    await page.goto(base+'#organizer-teams/T-001');await page.locator('.od-team-summary').waitFor();
+    assert.match(await page.locator('.od-heading h1').innerText(),/极光数据队/);
+    assert.equal(await page.getByRole('link',{name:'返回团队列表',exact:true}).getAttribute('href'),'#organizer-teams/organizer-mock-event');
+    await page.goto(base+'#organizer-teams');await page.locator('#od-results tbody').waitFor();
+    assert.equal(await teamRows().count(),8);
+    await clickMetric('submitted');assert.equal(await teamRows().count(),6);
+    await clickMetric('anomalies');assert.equal(await teamRows().count(),2);
+    await clickMetric('blocked');assert.equal(await teamRows().count(),1);assert.match(await teamRows().innerText(),/启明数据队/);
+    await clickMetric('all');
+    for(const metric of ['submitted','anomalies','blocked','all']){
+      await clickMetric(metric);
+      await page.goto(base+'#explore');await page.locator('#results').waitFor();
+      assert.ok(await page.locator('#results .competition-card').count()>0,'team metric must not change the discovery filter: '+metric);
+      await gotoTeams();await page.locator('#od-results').waitFor();
+    }
+    await page.locator('#od-search').fill('林舟');assert.equal(await teamRows().count(),1);assert.match(await teamRows().innerText(),/极光数据队/);
+    await page.locator('#od-search').fill(' T-003 ');assert.equal(await teamRows().count(),1);assert.match(await teamRows().innerText(),/星河探索队/);
+    await page.locator('#od-search').fill('不存在的团队');assert.equal(await teamRows().count(),0);assert.match(await page.locator('.od-empty').innerText(),/没有符合条件/);
+    await page.locator('[data-od="clear"]').first().click();
+    await page.locator('#od-status').selectOption('blocked');await page.locator('#od-anomalies').check();assert.equal(await teamRows().count(),0);
+    await page.locator('[data-od="clear"]').first().click();
+    await page.screenshot({path:output+'/list-desktop.png',fullPage:true});
+    const rowDates=await page.locator('#od-results tbody tr td:nth-child(6)').allTextContents();
+    assert.deepEqual(rowDates.slice(-2),['尚未提交','尚未提交']);
+    await gotoTeam('T-003');assert.match(await page.locator('.od-tasks').innerText(),/团队尚未提交数据/);
+    await gotoTeam();
+    assert.equal(await page.locator('.od-tasks tbody tr').count(),4);
+    assert.deepEqual(await page.locator('.od-tabs [role="tab"]').allTextContents(),['提交数据','操作记录']);
+    assert.equal(await page.locator('[data-od-tab="records"] span').count(),0,'records tab has no anomaly count badge');
+    assert.equal(await page.locator('.od-anomalies,.od-anomaly,.od-inline-alert').count(),0);
+    await liveShot('team');
+    await page.locator('[data-od="task"][data-task="Task-021"]').click();
+    assert.equal(await page.locator('.submission-version').count(),2);
+    const current=page.locator('.submission-version[data-revision="2"]'),prior=page.locator('.submission-version[data-revision="1"]');
+    assert.equal(await current.locator('.version-review').count(),0,'pending current version has no invented approval');
+    assert.match(await current.locator('.version-pending').innerText(),/本版本审核中/);
+    assert.equal(await prior.locator('.version-review').count(),1);
+    assert.match(await prior.locator('.version-review').innerText(),/需补正/);
+    assert.equal(await current.locator('.od-data-check').count(),1);
+    assert.equal(await prior.locator('.od-data-check').count(),0,'check evidence belongs to its actual version');
+    await page.setViewportSize({width:1600,height:1800});await liveShot('task-check','#dialog');
+    const downloadWait=page.waitForEvent('download');await current.locator('a.harbor-download-link').click();
+    const downloaded=await downloadWait,bytes=fs.readFileSync(await downloaded.path());assert.equal(bytes.readUInt32LE(0),0x04034b50);
+    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),'4b6a1a8f8e8e04745b5c8b48aa40adc6ed8ff8efcc48f9a81d14fbcbb327f477');
+    await prior.locator('[data-od="version-preview"]').click();
+    assert.match(await page.locator('#dialog h2').innerText(),/v1/);
+    assert.match(await page.locator('#dialog a.harbor-download-link').innerText(),/api_error_recovery_draft_01_v1.zip/);
+    await page.locator('[data-od="task"]').filter({hasText:'返回完整任务'}).click();
+    assert.equal(await page.locator('.submission-version.is-selected').getAttribute('data-revision'),'1');
+    await page.locator('[data-od="close-dialog"]').click();
+    await page.locator('[data-od="task"][data-task="Task-013"]').click();
+    assert.equal(await page.locator('.od-task-content h3').count(),4);assert.match(await page.locator('.od-task-content').innerText(),/任务说明[\s\S]*预期结果[\s\S]*验收标准/);
+    await liveShot('task-ale','#dialog');await page.locator('[data-od="close-dialog"]').click();
+    await page.setViewportSize({width:1600,height:1100});
+    await page.locator('[data-od-tab="records"]').click();
+    const events=page.locator('[data-od-record-id]');
+    assert.equal(await events.filter({has:page.locator('[data-od="resolve"]')}).count(),0);
+    assert.equal(await page.locator('[data-record-type="submission"]').count(),5,'each formal version has one submit node');
+    assert.equal(await page.locator('[data-record-type="review"]').count(),4,'only actual version reviews are recorded');
+    assert.equal(await page.locator('[data-record-task="Task-021"][data-record-version="2"][data-record-type="review"]').count(),0);
+    const eventIds=await events.evaluateAll(rows=>rows.map(r=>r.dataset.odRecordId));assert.equal(new Set(eventIds).size,eventIds.length);
+    assert.equal(await events.locator('time').count(),eventIds.length);assert.equal(await events.locator('.od-record-actor').count(),eventIds.length);
+    assert.equal(await events.locator('.od-record-note').count(),eventIds.length);
+    await page.evaluate(()=>render());assert.deepEqual(await events.evaluateAll(rows=>rows.map(r=>r.dataset.odRecordId)),eventIds,'re-render does not duplicate or reorder evidence');
+    await page.locator('[data-record-task="Task-021"][data-record-version="1"][data-record-type="submission"] [data-od="task"]').click();
+    assert.equal(await page.locator('.submission-version.is-selected').getAttribute('data-revision'),'1');
+    assert.equal(await page.locator('.submission-version[data-revision="2"] .version-review').count(),0);
+    await page.locator('[data-od="close-dialog"]').click();
+    await gotoTeam('T-008');
+    assert.equal(await page.locator('[data-record-task="Task-081"][data-record-version="2"][data-record-type="review"]').count(),2);
+    await page.locator('[data-record-task="Task-081"][data-record-version="2"] [data-od="task"]').first().click();
+    const accepted=page.locator('.submission-version[data-revision="2"]'),oldAccepted=page.locator('.submission-version[data-revision="1"]');
+    assert.equal(await accepted.locator('.version-review').count(),2);assert.equal(await oldAccepted.locator('.version-review').count(),1);
+    assert.match(await accepted.innerText(),/初审通过[\s\S]*已录用/);assert.match(await oldAccepted.innerText(),/需补正/);
+    assert.equal(await page.locator('.submission-version.is-selected').getAttribute('data-revision'),'2');
+    await page.setViewportSize({width:1600,height:1800});await liveShot('task-harbor','#dialog');
+    const snapshots=[];
+    for(const version of [oldAccepted,accepted]){
+      const pending=page.waitForEvent('download');await version.locator('a.harbor-download-link').click();const file=await pending;snapshots.push(fs.readFileSync(await file.path()));
+    }
+    assert.ok(!snapshots[0].equals(snapshots[1]),'old and new formal snapshots keep their own files');
+    await page.locator('[data-od="close-dialog"]').click();await page.setViewportSize({width:1600,height:1100});
+    await gotoTeam();
+    const originalTaskStates=(await read()).tasks.map(t=>[t.id,t.status,t.revision]);
+    const originalAnomalies=JSON.stringify((await read()).anomalies);
+    await page.locator('[data-od="block"]').click();
+    await page.locator('#od-block-form textarea').fill('   ');
+    await page.locator('#od-block-form button[type="submit"]').click();
+    assert.match(await page.locator('#od-form-error').innerText(),/1～200/);
+    assert.equal((await read()).teams[0].blacklisted,false);
+    await page.locator('[data-od="close-dialog"]').click();
+    await page.locator('[data-od="block"]').click();
+    await page.locator('#od-block-form textarea').fill('测试拉黑：核查期间暂停团队提交。');
+    await page.locator('#od-block-form button[type="submit"]').click();
+    await page.locator('#od-block-form').waitFor({state:'hidden'});
+    assert.equal((await read()).teams[0].blacklisted,true);
+    assert.equal(JSON.stringify((await read()).anomalies),originalAnomalies,'blacklisting does not change data evidence');
+    assert.match(await page.locator('#main .od-restriction').innerText(),/测试拉黑/);
+    const memberIds=await page.locator('#od-member option').evaluateAll(options=>options.map(o=>o.value));
+    for(const member of memberIds){
+      await page.locator('#od-member').selectOption(member);
+      for(const kind of ['new','correction'])assert.match(await simulate(kind),/已拒绝[\s\S]*限制提交/);
+    }
+    assert.deepEqual((await read()).tasks.map(t=>[t.id,t.status,t.revision]),originalTaskStates);
+    await page.evaluate(()=>window.scrollTo(0,0));
+    await page.screenshot({path:output+'/team-blocked.png',fullPage:true});
+    await page.reload();await page.locator('[data-od="unblock"]').waitFor();assert.equal((await read()).teams[0].blacklisted,true);
+    await page.locator('#od-phase').selectOption('closed');
+    await page.locator('[data-od="unblock"]').click();
+    await page.locator('#od-block-form textarea').fill('测试核查完成，恢复原有提交资格。');
+    await page.locator('#od-block-form button[type="submit"]').click();
+    await page.locator('#od-block-form').waitFor({state:'hidden'});
+    assert.equal(await page.locator('#od-phase').inputValue(),'closed','unblocking preserves the selected deadline scenario');
+    for(const kind of ['new','correction'])assert.match(await simulate(kind),/已拒绝[\s\S]*已结束/);
+    await page.locator('#od-phase').selectOption('open');
+    assert.match(await simulate('new'),/校验通过/);
+    await page.locator('#od-member').selectOption('T-001-member-1');
+    assert.match(await simulate('correction'),/已拒绝[\s\S]*当前成员没有需补正任务/);
+    await page.locator('#od-member').selectOption('T-001-member-2');
+    assert.match(await simulate('correction'),/校验通过/);
+    await page.locator('[data-od="tab"][data-od-tab="records"]').first().click();
+    assert.match(await page.locator('.od-operation-records').innerText(),/解除拉黑[\s\S]*拉黑团队/);
+    await liveShot('records');
+    const preserved=await page.evaluate(()=>{
+      state.competitions.push({id:'qa-original-event',ownerId:expertCenter.uid(),stage:'草稿',version:1,values:{name:'QA 保留的比赛'}});
+      state.draft={name:'QA 未提交比赛草稿',_step:0};persist();
+      localStorage.setItem(DataItems.key,JSON.stringify({records:[{id:'qa-original-draft',ownerId:expertCenter.uid(),status:'草稿',revision:0,form:{name:'QA 私人任务草稿'}}]}));
+      return {state:localStorage.getItem('ale-frontend-v1'),draft:localStorage.getItem(DataItems.key)};
+    });
+    await gotoTeams();await page.locator('[data-od="reset"]').click();
+    await page.locator('[data-od="confirm-reset"]').click();await page.locator('#od-results tbody').waitFor();
+    assert.deepEqual(await page.locator('.od-metric strong').allTextContents(),['8支团队','6支团队','2支团队','1支团队']);
+    const afterReset=await page.evaluate(()=>({state:localStorage.getItem('ale-frontend-v1'),draft:localStorage.getItem(DataItems.key)}));
+    assert.deepEqual(afterReset,preserved,'demo reset preserves the original event and draft stores');
+    assert.equal((await read('od-chart')).teams[0].blacklisted,true,'resetting one event preserves another event black list');
+    assert.equal((await read('od-science')).anomalies[0].status,'待处理','same anomaly IDs in other events stay independent');
+    await gotoTeams('od-chart');await page.locator('[data-od="reset"]').click();await page.locator('[data-od="confirm-reset"]').click();
+    assert.equal((await read('od-chart')).teams[0].blacklisted,false);
+    assert.equal((await read()).teams[3].blacklisted,true,'resetting chart event preserves the active event initial restriction');
+    await gotoTeams();
+    await page.evaluate(()=>{expertCenter.db.active='chen';expertCenter.save();render();});
+    assert.equal((await read()).ownerId,'chen');assert.equal((await read()).teams[0].blacklisted,false);
+    await gotoTeam();await setBlock(true,'陈思远身份的独立测试，不影响其他主办方。');
+    assert.equal((await read()).teams[0].blacklisted,true);
+    await page.evaluate(()=>{expertCenter.db.active='rong';expertCenter.save();render();});
+    await page.locator('.od-team-summary').waitFor();
+    assert.equal((await read()).teams[0].blacklisted,false,'switching owner does not leak blocked state');
+    await gotoTeams();
+    await page.setViewportSize({width:390,height:844});
+    await page.reload();await page.locator('#od-results tbody').waitFor();
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'mobile list fits viewport');
+    await page.screenshot({path:output+'/list-mobile.png',fullPage:true});
+    await gotoTeam();
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'mobile team detail fits viewport');
+    await page.screenshot({path:output+'/team-mobile.png',fullPage:true});
+    await page.locator('[data-od-tab="records"]').click();
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'mobile operation records fit viewport');
+    await page.locator('[data-od-record-id] [data-od="task"]').first().click();
+    assert.ok(await page.locator('#dialog').evaluate(el=>el.getBoundingClientRect().width<=window.innerWidth&&el.scrollWidth<=el.clientWidth),'shared version detail fits mobile dialog');
+    await page.locator('[data-od="close-dialog"]').click();
+    await page.goto(base+'#organizer');await page.locator('.oc-management tbody').first().waitFor();
+    assert.match(await page.locator('h1').innerText(),/主办方中心/);
+    assert.equal(await page.locator('.oc-management tr[data-oc-row="qa-original-event"] [data-oc="progress"]').count(),1,'unpublished actual event opens publishing progress');
+    assert.equal(await page.locator('.oc-local-draft [data-action="resume-draft"]').count(),1,'local draft card retains editing');
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'mobile organizer center fits viewport');
+    await page.screenshot({path:output+'/center-mobile.png',fullPage:true});
+    await page.goto(base+'#explore');await page.locator('#competition-list').waitFor();
+    assert.equal(await page.locator('.od-page').count(),0,'normal event discovery is unaffected');
+    assert.ok(await page.locator('#results .competition-card').count()>0,'existing discovery still has event cards');
+    const legacyContext=await browser.newContext(),legacyPage=await legacyContext.newPage();
+    try{
+      await legacyPage.goto(base+'#organizer-teams');await legacyPage.locator('#od-results tbody').waitFor();
+      await legacyPage.evaluate(()=>{
+        const d=OrganizerMocks.generate('rong');
+        const legacyVersion=d.tasks.find(t=>t.id==='Task-081').versions.find(v=>v.revision===2);delete legacyVersion.reviews;delete legacyVersion.processMock;
+        d.teams[0].blacklisted=true;d.teams[0].blacklistReason='迁移前保留的团队限制';d.teams[0].blockedAt=new Date().toISOString();
+        d.event={id:d.event.id,title:'旧版专业评测演示',registrationEnd:d.event.registrationEnd,submissionStart:d.event.submissionStart,submissionEnd:d.event.submissionEnd};
+        localStorage.setItem(OrganizerMocks.storageKey+':rong',JSON.stringify(d));
+      });
+      await legacyPage.reload();await legacyPage.locator('#od-results tbody').waitFor();
+      const migrated=await legacyPage.evaluate(()=>OrganizerDemoStore.read('organizer-mock-event'));
+      assert.equal(migrated.event.stage,'已发布');assert.equal(migrated.teams[0].blacklisted,true);assert.equal(migrated.teams[0].blacklistReason,'迁移前保留的团队限制');assert.equal(migrated.tasks.length,16);
+      assert.equal(migrated.tasks.find(t=>t.id==='Task-081').versions.find(v=>v.revision===2).reviews.length,2);
+      const upgradedEvents=await legacyPage.evaluate(()=>{const d=OrganizerDemoStore.read('organizer-mock-event');return OrganizerHistory.teamEvents(d,'T-008');});
+      assert.equal(new Set(upgradedEvents.map(e=>e.id)).size,upgradedEvents.length);
+      assert.equal(upgradedEvents.filter(e=>e.taskId==='Task-081'&&e.revision===2&&e.type==='review').length,2);
+      await legacyPage.evaluate(()=>{
+        const source=OrganizerMocks.listEvents('rong')[0];
+        state.competitions.push({...source,id:'qa-real-published',values:{...source.values,name:'QA 真实已发布赛事'}});
+        expertCenter.db.teams.push({id:'qa-real-team',cid:'qa-real-published',name:'QA 真实报名团队',leader:'rong',members:['rong']});
+        expertCenter.db.regs['qa-real-published']={rong:{at:Date.now()}};persist();
+        history.replaceState(null,'','#organizer');render();
+      });
+      await legacyPage.locator('tr[data-oc-row="qa-real-published"] .oc-manage-link').click();
+      await legacyPage.locator('.od-breadcrumb a[href="#organizer-teams/qa-real-published"]').waitFor();
+      assert.match(await legacyPage.locator('#main').innerText(),/QA 真实报名团队/);
+      assert.equal(await legacyPage.locator('[data-od="reset"]').count(),0);
+      await legacyPage.locator('.od-team-name').click();
+      await legacyPage.locator('.od-team-summary').waitFor();
+      assert.equal(await legacyPage.locator('[data-od="block"]').count(),0);
+      assert.equal(await legacyPage.locator('.od-participant').count(),0);
+    }finally{await legacyContext.close();}
+    assert.deepEqual(errors,[]);
+    console.log('Organizer demo browser passed: grouped published/pending rows, no action column, home/manage navigation, publishing progress, 8 event lifecycle scenarios, direct center rows, stage filters, event state/reset/simulator isolation, 8 active teams, filters, shared full-version details, ALE content, immutable submission/review timeline, all-member block/unblock, deadline denial, persistence, scoped reset, owner isolation, mobile and existing navigation.');
+  }finally{await context.close();await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

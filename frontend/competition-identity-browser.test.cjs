@@ -7,7 +7,7 @@ const cid='identity-verification-demo',second='profile-registration-second';
 const exampleName='演示用户',exampleNumber='000000200001010010';
 
 (async()=>{
-  const browser=await chromium.launch({channel:'msedge',headless:true});
+  const browser=await chromium.launch({channel:process.env.BENCHSQUARE_BROWSER||'chrome',headless:true});
   try{
     const page=await browser.newPage({viewport:{width:1440,height:950}});
     page.setDefaultTimeout(10000);
@@ -25,6 +25,11 @@ const exampleName='演示用户',exampleNumber='000000200001010010';
     const number=form.getByRole('textbox',{name:'身份证号码',exact:true});
     const read=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('ale-frontend-v1')));
     const profileMenu=()=>page.locator('.site-header [data-action="profile"]').click();
+    async function continueToTeam(){
+      const group=page.locator('#event-contact-dialog[open]');
+      await group.getByRole('button',{name:'继续组队',exact:true}).click();
+      await title('报名成功，继续完成组队').waitFor();
+    }
     async function switchTo(user){
       await page.locator('[data-expert="demo"]').click();
       await page.locator('#participation-user').selectOption(user);
@@ -37,7 +42,7 @@ const exampleName='演示用户',exampleNumber='000000200001010010';
       assert.equal(await verifyLink.count(),0);
       await dialog.getByRole('checkbox').check();
       await button('确认报名').click();
-      await title('报名成功，继续完成组队').waitFor();
+      await continueToTeam();
     }
 
     await page.goto(route('discover'));
@@ -78,7 +83,7 @@ const exampleName='演示用户',exampleNumber='000000200001010010';
     await page.reload();
     await sample.getByRole('link',{name:'赛事身份认证体验赛',exact:true}).click();
     await page.getByRole('tab',{name:'参赛规则',exact:true}).click();
-    await page.locator('#main').getByText('报名赛事前，请先在个人资料完成一次实名认证。',{exact:true}).waitFor();
+    await page.locator('#main').getByText('报名赛事前，请先在个人资料完成实名认证并上传简历。',{exact:true}).waitFor();
     await button('报名参加比赛').click();
     await signup.waitFor();
     assert.match(await signup.innerText(),/参赛资格：[\s\S]*参赛形式：[\s\S]*人数上限：[\s\S]*报名后需创建或加入团队/);
@@ -106,6 +111,7 @@ const exampleName='演示用户',exampleNumber='000000200001010010';
     await button('立即核验').click();
     assert.match(await form.getByRole('alert').innerText(),/未匹配/);
     assert.equal((await read()).participation.accounts.rong,undefined);
+    await page.evaluate(()=>ResumeFiles.save('rong',new File(['%PDF-1.4\nDemo resume'],'演示简历.pdf',{type:'application/pdf'})));
     await name.fill(exampleName);
     await button('立即核验').click();
     await signup.waitFor();
@@ -126,7 +132,7 @@ const exampleName='演示用户',exampleNumber='000000200001010010';
     assert.equal((await read()).participation.regs[cid].rong,undefined,'rules must be accepted');
     await dialog.getByRole('checkbox').check();
     await button('确认报名').click();
-    await title('报名成功，继续完成组队').waitFor();
+    await continueToTeam();
     await button('创建团队').click();
     await dialog.getByLabel('团队名称').fill('实名体验组');
     await button('创建团队并正式参赛').click();
