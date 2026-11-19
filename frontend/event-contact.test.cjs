@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict');
+const C=require('./event-contact.js');
+const start=C.time('2026-11-01T09:00'),end=C.time('2026-12-01T18:00');
+const c={id:'demo',stage:'已发布',values:{name:'示例赛事',registrationStart:'2026-11-01T09:00',submissionEnd:'2026-11-20T18:00',correctionEnd:'2026-11-25T18:00',publicationAt:'2026-12-01T18:00'}};
+assert.equal(start,Date.parse('2026-11-01T09:00:00+08:00'),'unqualified event times use Beijing time');
+assert.equal(C.communityAvailable(c,start-1),false,'group entry is absent before registration opens');
+assert.equal(C.communityAvailable(c,start),true,'entry opens at registration start');
+assert.equal(C.communityAvailable(c,end-1),true,'entry stays during correction and pending publication');
+assert.equal(C.communityAvailable(c,end),false,'entry closes at competition end');
+assert.equal(C.communityAvailable({...c,stage:'审核中'},start+1),false,'unpublished competition never shows a group entry');
+assert.equal(C.communityAvailable({...c,values:{...c.values,publicationAt:'待确定'}},C.time(c.values.correctionEnd)-1),true,'unknown publication falls back to the valid correction deadline');
+assert.equal(C.communityAvailable({...c,values:{...c.values,publicationAt:'待确定'}},C.time(c.values.correctionEnd)),false);
+assert.equal(C.communityAvailable({id:'legacy',registrationStart:start,end},start),true,'published legacy public records use start/end aliases');
+assert.equal(C.communityAvailable({id:'missing',values:{registrationStart:'invalid'}},start),false,'unknown schedule does not open the entry');
+assert.equal(C.communityAvailable({stage:'已发布',values:{schedule:{regStart:start,submitEnd:start+100,publicationAt:end}}},end-1),true,'schedule aliases use the same full competition window');
+console.log('event-contact tests passed');

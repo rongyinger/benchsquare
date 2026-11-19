@@ -4,7 +4,7 @@ function creationDraftKey(draft){return draft.editId||'new';}
 function hasCreationDraft(draft=state.draft){
   if(draft.editId)return true;
   const oldEligibility='参赛资格由平台统一规定。参赛者须在报名期内完成报名，并同意平台参赛规则与数据许可条款。';
-  return Object.entries(draft).some(([key,value])=>key!=='distribution'&&!key.startsWith('_')&&String(value??'').trim()!==''&&!(key==='eligibility'&&value===oldEligibility)&&(!(key in participationRuleDefaults)||String(value)!==String(participationRuleDefaults[key])));
+  return Object.entries(draft).some(([key,value])=>!['distribution','identityVerification'].includes(key)&&!key.startsWith('_')&&String(value??'').trim()!==''&&!(key==='eligibility'&&value===oldEligibility)&&(!(key in participationRuleDefaults)||String(value)!==String(participationRuleDefaults[key])));
 }
 function parkedCreationDrafts(){state.parkedCreationDrafts ||= {};return state.parkedCreationDrafts[creationActor()] ||= {};}
 function parkCreationDraft(){if(hasCreationDraft())parkedCreationDrafts()[creationDraftKey(state.draft)]=JSON.parse(JSON.stringify({...state.draft,_step:step}));}

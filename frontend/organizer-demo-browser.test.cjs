@@ -33,6 +33,10 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   };
   const simulate=async(kind)=>{
     await page.locator('[data-od="simulate"][data-kind="'+kind+'"]').click();
+    if(await page.locator('#event-contact-dialog[open]').count()){
+      assert.match(await page.locator('#event-contact-dialog').innerText(),/已被拉黑[\s\S]*企业微信申诉/);
+      await page.locator('[data-event-contact-close]').first().click();
+    }
     return page.locator('#od-simulation-result').innerText();
   };
   try{
@@ -107,6 +111,27 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
       assert.equal(new URL(page.url()).hash,'#organizer-teams/'+id);
       await page.goto(base+'#organizer');await page.locator('.oc-management tbody').first().waitFor();
     }
+    await page.goto(base+'#competition/od-chart');
+    const organizerRegistration=page.locator('[data-op-register="od-chart"]');
+    await organizerRegistration.click();
+    const identityForm=page.locator('#expert-identity-form');
+    await identityForm.locator('[name="realName"]').fill('演示用户');
+    await identityForm.locator('[name="idNumber"]').fill('000000200001010010');
+    await identityForm.locator('button[type="submit"]').click();
+    const resumeForm=page.locator('#expert-resume-form');
+    await resumeForm.waitFor();
+    assert.equal((await read('od-chart')).participantRegistration,undefined);
+    await resumeForm.locator('[name="resume"]').setInputFiles({name:'resume.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\n%%EOF')});
+    await resumeForm.locator('button[type="submit"]').click();
+    await resumeForm.locator('[data-resume-continue]').click();
+    await page.locator('#op-registration-rules').check();
+    await page.locator('[data-op-confirm-register="od-chart"]').click();
+    const registrationGroup=page.locator('#event-contact-dialog[open]');
+    await registrationGroup.waitFor();
+    assert.match(await registrationGroup.innerText(),/报名成功/);
+    assert.equal((await read('od-chart')).participantRegistration.userId,'rong');
+    await registrationGroup.locator('[data-event-contact-close]').first().click();
+    await page.goto(base+'#organizer');await page.locator('.oc-management tbody').first().waitFor();
     await page.locator('[data-organizer-tab="data"]').click();
     assert.equal(await page.locator('.oc-overview tbody tr').count(),8);
     assert.ok(!(await page.locator('.oc-overview th').allTextContents()).includes('操作'));

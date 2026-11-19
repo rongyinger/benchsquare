@@ -127,7 +127,7 @@
         let reason=M.submissionPermission(d,tid,phase);
         if(!reason&&phase==='correction'&&b.dataset.kind==='new')reason='新增提交已截止，当前仅接受符合条件的补正重提。';
         if(!reason&&b.dataset.kind==='correction'&&!d.tasks.some(t=>t.teamId===tid&&t.submitter===member.name&&t.status==='需补正'))reason='当前成员没有需补正任务，不能代替其他成员重提。';
-        const target=$('#od-simulation-result');target.classList.toggle('is-denied',!!reason);target.textContent=(reason?'已拒绝':'校验通过')+' · '+member.name+' · '+(b.dataset.kind==='correction'?'补正重提':'新提交')+'：'+(reason||'当前符合提交条件；本次仅测试资格，未新增任务或版本。');break;
+        const target=$('#od-simulation-result');target.classList.toggle('is-denied',!!reason);target.textContent=(reason?'已拒绝':'校验通过')+' · '+member.name+' · '+(b.dataset.kind==='correction'?'补正重提':'新提交')+'：'+(reason||'当前符合提交条件；本次仅测试资格，未新增任务或版本。');if(t.blacklisted)window.EventContact.openAppeal({eventTitle:d.event.title,teamName:t.name,reason:t.blacklistReason});break;
       }
     }}catch(error){toast(error.message||'操作失败，请重试。');}
   });

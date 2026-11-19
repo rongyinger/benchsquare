@@ -1,5 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),W=require('./workbench-model.js');
+const identity=require('./competition-identity.js');
 const c={id:'c',stage:'已发布',start:'2026-10-21T09:00:00+08:00',end:'2026-11-30T18:00:00+08:00'};
 const s={competitions:[c],participation:{active:'member',regs:{c:{member:{},leader:{}}},teams:[{id:'t',cid:'c',leader:'leader',members:['leader','member']}]}};
 const x=W.context(s,'c','t');
@@ -13,4 +14,32 @@ assert.equal(W.permission(late,'real',true,{status:'需修改'}),'');
 assert.match(W.permission(late,'real',true,null),/已截止/);
 late.competition.values.correctionEnd='';assert.match(W.permission(late,'real',true,{status:'需修改'}),/未公布/);
 assert.equal(W.taskStatus('已提交'),'待初审');assert.equal(W.taskStatus('待质检'),'待初审');
+// A team restriction covers every member and every formal submission, while drafts remain available.
+s.participation.teams[0].blacklisted=true;s.participation.teams[0].blacklistReason='材料来源待核查';
+for(const user of ['leader','member']){
+ s.participation.active=user;const blocked=W.context(s,'c','t');
+ assert.equal(W.restriction(blocked).reason,'材料来源待核查');
+ assert.match(W.permission(blocked,'open',true),/已被拉黑.*企业微信申诉/);
+ assert.match(W.permission({...late,team:blocked.team},'open',true,{status:'需修改'}),/已被拉黑/);
+ assert.equal(W.permission(blocked,'open',false),'','blacklisted teams retain draft access');
+}
+assert.equal(W.restriction({...x,competition:{id:'other'}}),null,'restriction is scoped to its competition');
+assert.equal(W.restriction(W.context(s,'c','missing')),null);
+s.participation.teams[0].blacklisted=false;
+assert.equal(W.permission(W.context(s,'c','t'),'open',true),'','unblocking restores original permission checks');
+const other={...c,id:'other',values:{identityVerification:'实名认证'}};
+s.competitions.push(other);
+c.values={identityVerification:'实名认证'};
+s.participation.regs.other={leader:{identityAttempts:[{review:{status:'approved',at:Date.now()}}]}};
+s.participation.teams.push({id:'other-team',cid:'other',leader:'leader',members:['leader']});
+assert.match(W.permission(W.context(s,'c','t'),'open',true),/个人资料完成实名认证/);
+s.participation.active='leader';
+assert.equal(W.permission(W.context(s,'other','other-team'),'open',true),'');
+s.participation.regs.c.leader.identityAttempts=[{review:{status:'returned'}},{}];
+assert.match(W.permission(W.context(s,'c','t'),'open',true),/个人资料完成实名认证/);
+s.participation.regs.other.leader.realNameVerifiedAt=Date.now();
+identity.migrate(s.participation);
+assert.equal(identity.verifiedAt(s.participation,'leader'),s.participation.regs.other.leader.realNameVerifiedAt);
+assert.equal(identity.verifiedAt(s.participation,'member'),undefined);
+assert.equal(W.permission(W.context(s,'c','t'),'open',true),'');
 console.log('Workbench model: exact time boundaries, individual submission permissions, missing schedule, competition/team access and record isolation passed.');

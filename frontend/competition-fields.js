@@ -84,7 +84,7 @@ function competitionFieldModules(c,indexes){
     }else if(index===1){
       content=`<div class="competition-section-heading"><h2>任务要求与验收</h2>${field('domain','competition-domain')}</div><div class="competition-task-cards"><article><span class="competition-card-number">01</span>${field('boundary')}</article><article><span class="competition-card-number">02</span>${field('acceptance')}</article></div>`;
     }else if(index===2){
-      content=`<h2>参赛规则</h2><p class="competition-field-note">以下为主办方制定并经审核发布的本比赛参赛规则。</p><div class="competition-rule-facts">${field('teamMode')}${field('teamMax')}</div><div class="competition-eligibility">${field('eligibility')}</div>`;
+      content=`<h2>参赛规则</h2><p class="competition-field-note">报名赛事前，请先在个人资料完成实名认证并上传简历。</p><div class="competition-rule-facts">${field('teamMode')}${field('teamMax')}</div><div class="competition-eligibility">${field('eligibility')}</div>`;
     }else if(index===4){
       content=`<h2>提交规范</h2><div class="competition-materials">${field('materials')}</div><div class="competition-spec-cards">${['environment','formats','fields','scale'].map(key=>`<article>${field(key)}</article>`).join('')}</div>`;
     }else if(index===3){
