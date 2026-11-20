@@ -8,6 +8,8 @@
   if(embedded)document.body.classList.add('submission-embedded');
   const teamWorkspaceKey=scoped?cid+':'+tid:null;
   const context=()=>W.context(W.read(),cid,tid,DEMO_COMPETITIONS);
+  const submissionBlock=()=>cid?W.submissionBlock(context()):'';
+  const submissionBlockNotice=()=>{const reason=submissionBlock();return reason?`<p class="warning" id="submission-block">${E(reason)} 你仍可保存草稿。</p>`:'';};
   const actor=dashboard||scoped?context().user:null;
   const workspaceKey=dashboard?'dashboard:'+actor+':'+(params.get('item')||params.get('fresh')||'new'):scoped?teamWorkspaceKey+':'+actor:null;
   const issue=(submit=false,targetId)=>{const target=store.records.find(r=>r.id===(targetId||editingId));if(DataItems.locked(target))return '当前数据已锁定，仅可查看详情、下载附件和查看历史记录；只有草稿或退回补正的数据可编辑。';if(dashboard){if(context().user!==actor||sessionStorage.getItem('expert-demo-out')==='yes')return '演示身份已变化，请重新进入。';if(!submit)return '';if(!cid)return '请先选择要提交的比赛。';return W.permission(context(),W.read().participation?.workbenchClock?.[cid],true,target);}if(!scoped)return '';if(!cid||!tid)return '比赛或团队信息不完整，请从比赛详情重新进入。';const x=context();if(x.user!==actor)return '演示身份已变化，请返回比赛详情重新进入。';return W.permission(x,W.read().participation?.workbenchClock?.[cid],submit,store.records.find(r=>r.id===(targetId||(location.hash.startsWith('#detail/')?location.hash.split('/')[1]:editingId))));};
@@ -41,7 +43,7 @@
   const section=(n,title,desc,body)=>`<section class="form-card" id="section-${n}"><div class="section-head"><div><h2>${title}</h2><p>${desc}</p></div></div>${body}</section>`;
   function attachmentList(f,category,editable=false){const list=M.activeAttachments(f).filter(a=>!category||a.category===category);return list.length?`<ul class="file-list">${list.map(a=>`<li><span class="file-symbol">▤</span><div><strong>${E(a.name)}</strong><small>${a.source==='placeholder'?'演示占位文件 · 未选择实际文件':files.has(a.id)?`${((files.get(a.id)?.size??a.size??0)/1024).toFixed(1)} KB · ${dashboard?'已选择，可保存至当前浏览器':'当前会话已选择，未上传'}`:'仅保留元信息 · 需要重新选择'} </small></div>${dashboard||a.category==='harbor'?`<button type="button" class="dd-file-download" data-download="${E(a.id)}">下载</button>`:''}${editable?`<button type="button" class="remove" data-remove="${E(a.id)}" aria-label="删除 ${E(a.name)}">×</button>`:''}</li>`).join('')}</ul>`:'<p class="empty-files">'+(M.format(f)==='harbor'?'尚未选择 Harbor 压缩包':'未添加附件 · 支持纯文本任务')+'</p>';}
   function uploads(){return `<div id="f-attachments" tabindex="-1" aria-describedby="err-attachments"><label class="dropzone harbor-dropzone" data-category="harbor"><input type="file" accept=".zip,.tar.gz,.tgz" data-upload="harbor" aria-label="选择 Harbor 压缩包"><span class="upload-icon">↑</span><strong>${M.harborAttachments(form).length?'重新选择 Harbor 压缩包':'点击选择 Harbor 压缩包'}</strong><span>或将一个压缩文件拖到这里</span><small>支持 .zip / .tar.gz / .tgz · 单个文件 ≤ 50 GB</small></label><p id="err-attachments" class="error" role="alert"></p>${attachmentList(form,'harbor',true)}<p class="hint">每次提交一个压缩包，重新选择将替换当前文件。</p><p class="hint">${dashboard?'本演示将文件保存在当前浏览器，支持刷新后恢复；本地保存上限为 1 GB。':'本演示仅保留当前会话中的文件，刷新或关闭后需重新选择。'} Harbor 内容完整性与可运行性由后续审核确认。</p></div>`;}
-  function syncSubmit(){document.querySelectorAll('[data-do="submit"]').forEach(b=>{b.disabled=busy||!form.terms;b.title=(!form.terms)?'请先勾选诚信承诺':'';});}
+  function syncSubmit(){const reason=submissionBlock();document.querySelectorAll('[data-do="submit"]').forEach(b=>{b.disabled=busy||!!reason||!form.terms;b.title=reason||(!form.terms?'请先勾选诚信承诺':'');});}
   function updateProgress(){syncSubmit();if($('#save-state'))$('#save-state').textContent=dirty()?'有未保存修改':'已保存至当前浏览器';}
   const field=(key,label,control,hint='',required=false)=>`<div class="field" data-field="${key}"><label for="f-${key}">${label}${required?'<b class="required">*</b>':'<small>选填</small>'}</label>${hint?`<p class="hint" id="hint-${key}">${hint}</p>`:''}${control}<p class="error" id="err-${key}" role="alert"></p></div>`;
   const input=(k,placeholder='',type='text')=>`<input id="f-${k}" name="${k}" type="${type}" value="${E(form[k])}" placeholder="${placeholder}" aria-describedby="hint-${k} err-${k}" ${type==='number'?'min="0.01" step="any"':''}>`;
@@ -59,7 +61,7 @@
     ${section(1,'Harbor 包提交','无需单独填写任务信息，上传压缩包并完成下方确认后提交。',uploads())}
     <details class="harbor-guide"><summary>如何准备 Harbor 任务包</summary><p>将完整任务目录压缩为一个文件。任务目录包含 task.toml、instruction.md，以及任务所需的 environment/、tests/ 和参考解答等文件。</p><p>请保留目录结构与文件间的相对路径。</p><a href="https://www.harborframework.com/docs/tasks" target="_blank" rel="noopener">查看 Harbor 格式文档 ↗</a></details>
     ${confirmations()}
-    <div class="action-bar"><span id="save-state"></span><div>${btn('save','保存草稿')}${btn('submit','提交 Harbor 包',true)}</div></div></form></div></div>`;
+    ${submissionBlockNotice()}<div class="action-bar"><span id="save-state"></span><div>${btn('save','保存草稿')}${btn('submit','提交 Harbor 包',true)}</div></div></form></div></div>`;
   }
 
   function questionEditor(){const record=store.records.find(r=>r.id===editingId&&visible(r));if(record&&DataItems.locked(record))return detail(record.id);
@@ -75,7 +77,7 @@
     ${section(2,'材料与参考结果','输入素材和参考结果均为选填，建议尽量提供。',questionUploads()+field('cloudLink','Google Drive / Dropbox 链接',input('cloudLink','https://drive.google.com/… 或 https://www.dropbox.com/…','url'),'文件大于 1 GB 时可填写分享链接，请先向审核方开放访问权限。'))}
     ${section(3,'验证标准','定义严格、客观、可机械判定的成功标准。',field('verification','如何验证成功 · How should we verify success?',`<div class="markdown-toolbar"><div role="group" aria-label="Markdown 模式"><button type="button" data-do="md-edit" class="active">Markdown 编辑</button><button type="button" data-do="md-preview">预览</button></div></div>${area('verification','比什么：输出产物与参考结果的哪些指标？\n怎么比：采用什么检查步骤？\n容差：误差多少算通过？\n必检项与否决项：哪些内容必须具备，哪些情况直接失败？',10)}<div id="markdown-preview" class="markdown" hidden></div>`,'支持 Markdown。请写明参考值、容差、必检项与否决条件。',true))}
     ${confirmations()}
-    <div class="action-bar"><span id="save-state"></span><div>${btn('save','保存草稿')}${btn('preview','预览任务')}${btn('submit','提交审核',true)}</div></div></form></div></div>`;
+    ${submissionBlockNotice()}<div class="action-bar"><span id="save-state"></span><div>${btn('save','保存草稿')}${btn('preview','预览任务')}${btn('submit','提交审核',true)}</div></div></form></div></div>`;
   }
 
   const read=(label,value)=>`<div class="read-field"><h4>${label}</h4><div>${E(value||'未填写')}</div></div>`;

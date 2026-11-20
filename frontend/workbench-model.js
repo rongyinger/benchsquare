@@ -8,7 +8,7 @@
     const competition=[...(state.competitions||[]).filter(c=>c.stage==='已发布'),...fixtures].find(c=>c.id===cid);
     const team=(p.teams||[]).find(t=>t.cid===cid&&(!tid||t.id===tid)&&t.members.includes(user));
     const registration=p.regs?.[cid]?.[user];
-    return {competition,team,user,leader:team?.leader===user,registered:!!registration,identityVerified:identity.enrollmentEligible(p,competition,user,registration)};
+    return {competition,team,user,leader:team?.leader===user,registered:!!registration,identityVerified:identity.enrollmentEligible(p,competition,user,registration),submissionBlocked:registration?.submissionBlocked===true};
   }
   const time=value=>{if(!value)return NaN;let v=String(value).replace(' ','T');if(/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?$/.test(v))v+='+08:00';return Date.parse(v);};
   function phase(c,override,now=Date.now()){
@@ -21,12 +21,14 @@
     if(!ctx.competition||!ctx.team||ctx.team.cid!==ctx.competition.id||ctx.team.blacklisted!==true)return null;
     return {eventTitle:ctx.competition.title||ctx.competition.values?.name||'当前赛事',teamName:ctx.team.name||'当前团队',reason:ctx.team.blacklistReason||'主办方已暂停该团队在本赛事的提交资格。'};
   }
+  const submissionBlock=ctx=>ctx.submissionBlocked?'你已被本赛事拉黑，无法提交或重新提交数据。':'';
   function permission(ctx,override,submit=false,record=null){
     if(!ctx.competition)return '比赛不存在或尚未发布。';
     if(!ctx.registered||!ctx.team)return '请先报名并创建或加入团队，再进入参赛工作台。';
     if(ctx.identityVerified===false)return '请先在个人资料完成实名认证。';
     if(typeof sessionStorage!=='undefined'&&sessionStorage.getItem('expert-demo-out')==='yes')return '请先在个人中心登录演示身份。';
     if(submit&&restriction(ctx))return '当前团队已被拉黑，无法新提交或补正重提。请联系企业微信申诉。';
+    if(submit&&ctx.submissionBlocked)return submissionBlock(ctx);
     const stage=phase(ctx.competition,override);
     if(stage==='closed'&&override!=='closed'&&taskStatus(record?.status)==='需修改'){
       const raw=ctx.competition.values?.correctionEnd;
@@ -40,6 +42,6 @@
   const belongs=(r,cid,tid)=>r.competitionId===cid&&r.teamId===tid;
   const ownerOf=(r,team)=>r.ownerId||r.history?.[0]?.by||r.updatedBy||team?.leader;
   const taskStatus=s=>({'已提交':'待初审','待质检':'待初审'})[s]||s;
-  const api={stateKey,read,context,phase,restriction,permission,belongs,ownerOf,taskStatus};
+  const api={stateKey,read,context,phase,restriction,submissionBlock,permission,belongs,ownerOf,taskStatus};
   if(typeof module!=='undefined')module.exports=api;else root.WorkbenchModel=api;
 })(typeof window==='undefined'?globalThis:window);
