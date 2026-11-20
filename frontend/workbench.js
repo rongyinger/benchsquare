@@ -14,9 +14,10 @@
   }
   function requestClose(){drawer?.querySelector('iframe').contentWindow.postMessage({type:'submission-close-request'},location.origin);}
   function open(cid){
-    const blocked=W.restriction(W.context(W.read(),cid,null,all()));
-    if(blocked){window.EventContact.openAppeal(blocked);return;}
     if(window.DataDashboard){window.DataDashboard.openCompetition(cid);return;}
+    const current=W.context(W.read(),cid,null,all()),blocked=W.restriction(current),message=W.submissionBlock(current);
+    if(blocked){window.EventContact.openAppeal(blocked);return;}
+    if(message){window.EventContact.openSubmissionBlock(message);return;}
     const x=ctx(cid);if(!x.team||!x.registered){toast('请先报名并完成组队。');return;}
     if(drawer)return;
     opener=document.activeElement;previousOverflow=document.body.style.overflow;
@@ -54,7 +55,7 @@
     if(!state.competitions.some(c=>c.id===cid))state.competitions.push({id:cid,stage:'已发布',ownerId:u,values:{name:blocked?'专业评测任务征集 · 拉黑示例':'专业评测任务征集 · 提交演示',organizer:'Benchsquare 演示工作组',domain:'科学推理',description:blocked?'虚构示例：参赛者已完成报名和组队，但因被拉黑而无法提交数据。':'体验从团队协作到任务提交的完整流程。',registrationStart:blocked?date(-20):'2026-10-01T09:00',registrationEnd:blocked?date(-2):'2026-10-20T18:00',submissionStart:blocked?date(-1):'2026-10-21T09:00',submissionEnd:blocked?date(30):'2026-11-30T18:00',teamMode:'团队',teamMax:5,pool:10000,materials:'可提交 Harbor 压缩包，或填写 ALE 任务说明和评分标准。',environment:'在 Harbor 包内提供运行环境和依赖，或在 ALE 任务格式中填写软件及操作系统。',formats:'Harbor 支持单个 .zip、.tar.gz 或 .tgz 压缩包；ALE 支持任务文本及选填附件。本地单文件保存上限为 1 GB。',fields:'ALE 任务填写短名、领域、运行环境、任务说明与验证标准；两种格式均须勾选诚信承诺。',scale:'本演示不限制任务数量；不执行附件或真实评测。',acceptance:'目标明确、输入完整、结果可复现，验证标准可核查。'}});
     p.regs[cid]||={};p.regs[cid][u]||={at:blocked?Date.parse(find(cid).deadline)-86400000:now,rulesVersion:1};
     if(blocked)p.regs[cid][u].submissionBlocked=true;
-    if(!p.teams.some(t=>t.cid===cid&&t.members.includes(u)))p.teams.push({id:(blocked?'wb-blocked-team-':'wb-team-')+u,cid,name:'专业任务共创队 · '+u,leader:u,members:[u],description:'任务提交体验团队',allow:false});p.workbenchClock||={};p.workbenchClock[cid]='open';if(persist()){go('#competition/'+cid);setTimeout(()=>open(cid),0);}
+    if(!p.teams.some(t=>t.cid===cid&&t.members.includes(u)))p.teams.push({id:(blocked?'wb-blocked-team-':'wb-team-')+u,cid,name:'专业任务共创队 · '+u,leader:u,members:[u],description:'任务提交体验团队',allow:false});p.workbenchClock||={};p.workbenchClock[cid]='open';if(persist()){go('#competition/'+cid);if(!blocked)setTimeout(()=>open(cid),0);}
   });
   render();
 })();

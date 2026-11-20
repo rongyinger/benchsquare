@@ -35,6 +35,7 @@
     notice(message);
     const blocked=submit&&W.restriction(context());
     if(blocked)window.EventContact.openAppeal(blocked);
+    else if(submit&&message===submissionBlock())window.EventContact.openSubmissionBlock(message);
   }
   function persist(next){try{let latest=JSON.parse(localStorage.getItem(M.config.storageKey)||'null');if(latest?.records)latest=DataMocks.upgrade(latest);if(latest?.records&&JSON.stringify(latest.records.filter(visible).map(r=>({...r,form:M.normalize(r.form),...(r.draftForm?{draftForm:M.normalize(r.draftForm)}:{}),history:(r.history||[]).map(h=>({...h,...(h.form?{form:M.normalize(h.form)}:{})}))})))!==JSON.stringify(store.records.filter(visible))){notice('你的任务已在其他页面更新，请保留当前内容并刷新后继续。');return false;}if(latest?.records)next.records=[...latest.records.filter(r=>!visible(r)),...next.records.filter(visible)];if(!scoped&&!dashboard&&latest?.workspaces)next.workspaces=latest.workspaces;if(scoped||dashboard)next.workspaces={...(latest?.workspaces||store.workspaces),[workspaceKey]:next.work};localStorage.setItem(M.config.storageKey,JSON.stringify(scoped||dashboard?{...next,work:latest?.work||null}:next));store=next;return true;}catch{notice('浏览器存储不可用或已满，本次未保存。请保留页面后重试。');return false;}}
   function stash(){persist({...store,work:{id:editingId,form:clone(form),baseline,...(dashboard?{competitionId:cid}:{})}});updateProgress();}
