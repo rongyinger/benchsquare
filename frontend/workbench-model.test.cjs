@@ -14,19 +14,18 @@ assert.equal(W.permission(late,'real',true,{status:'需修改'}),'');
 assert.match(W.permission(late,'real',true,null),/已截止/);
 late.competition.values.correctionEnd='';assert.match(W.permission(late,'real',true,{status:'需修改'}),/未公布/);
 assert.equal(W.taskStatus('已提交'),'待初审');assert.equal(W.taskStatus('待质检'),'待初审');
-// A team restriction covers every member and every formal submission, while drafts remain available.
-s.participation.teams[0].blacklisted=true;s.participation.teams[0].blacklistReason='材料来源待核查';
-for(const user of ['leader','member']){
- s.participation.active=user;const blocked=W.context(s,'c','t');
- assert.equal(W.restriction(blocked).reason,'材料来源待核查');
- assert.match(W.permission(blocked,'open',true),/已被拉黑.*企业微信申诉/);
- assert.match(W.permission({...late,team:blocked.team},'open',true,{status:'需修改'}),/已被拉黑/);
- assert.equal(W.permission(blocked,'open',false),'','blacklisted teams retain draft access');
-}
-assert.equal(W.restriction({...x,competition:{id:'other'}}),null,'restriction is scoped to its competition');
-assert.equal(W.restriction(W.context(s,'c','missing')),null);
-s.participation.teams[0].blacklisted=false;
-assert.equal(W.permission(W.context(s,'c','t'),'open',true),'','unblocking restores original permission checks');
+// Only the selected personal registration is blocked; legacy team flags never deny teammates.
+s.participation.teams[0].blacklisted=true;
+s.participation.regs.c.member.submissionBlocked=true;
+s.participation.regs.c.member.submissionBlockedReason='材料来源待核查';
+s.participation.active='member';
+assert.match(W.permission(W.context(s,'c','t'),'open',true),/本赛事拉黑/);
+assert.equal(W.permission(W.context(s,'c','t'),'open',false),'');
+assert.equal(W.restriction(W.context(s,'c','t')).reason,'材料来源待核查');
+s.participation.active='leader';
+assert.equal(W.permission(W.context(s,'c','t'),'open',true),'','teammates are unaffected even with a legacy team flag');
+s.participation.regs.c.member.submissionBlocked=false;
+assert.equal(W.permission(W.context(s,'c','t'),'closed',true).includes('截止'),true);
 const other={...c,id:'other',values:{identityVerification:'实名认证'}};
 s.competitions.push(other);
 c.values={identityVerification:'实名认证'};

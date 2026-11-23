@@ -95,10 +95,8 @@
       ['T-008','桥木数据队',['陆遥','宋安']]
     ];
     const teams=teamSpecs.map(([id,name,names],i)=>({
-      id,name,leader:names[0],members:names.map((name,n)=>({id:id+'-member-'+(n+1),name})),
-      registeredAt:ago(240-i),blacklisted:id==='T-004',
-      blacklistReason:id==='T-004'?'材料来源说明不完整，核查期间暂停该团队继续提交。':'',
-      blockedAt:id==='T-004'?ago(4):null
+      id,name,leader:names[0],members:names.map((name,n)=>({id:id+'-member-'+(n+1),name,submissionBlocked:id==='T-004'&&n===0,submissionBlockedReason:id==='T-004'&&n===0?'材料来源说明不完整，核查期间暂停该个人提交。':''})),
+      registeredAt:ago(240-i)
     }));
     const specs=[
       ['Task-021','T-001','依赖环境冲突复现','harbor','审核中',0.5,'dependency',2,'recovery'],
@@ -148,12 +146,12 @@
     },{
       id:'A-002',type:'人工标记',teamIds:['T-004'],taskRefs:[{taskId:'Task-041',revision:1}],
       evidence:'人工核查发现材料来源说明缺失，需团队补充来源证明。',
-      status:'已处理',foundAt:ago(5),outcome:'确认存在问题',note:'已确认来源说明缺失，先暂停该团队提交，历史任务继续按审核规则处理。',
+      status:'已处理',foundAt:ago(5),outcome:'确认存在问题',note:'已确认来源说明缺失，先暂停该个人提交，历史任务继续按审核规则处理。',
       handledBy:ownerId,handledAt:ago(4.5)
     }],logs:[
       {id:'L-001',action:'标记异常',anomalyId:'A-002',teamId:'T-004',actor:ownerId,reason:'材料来源说明缺失。',at:ago(5)},
       {id:'L-002',action:'处理异常',anomalyId:'A-002',teamId:'T-004',actor:ownerId,reason:'确认存在问题：材料来源说明缺失。',at:ago(4.5)},
-      {id:'L-003',action:'拉黑团队',teamId:'T-004',actor:ownerId,reason:teams[3].blacklistReason,at:ago(4)}
+      {id:'L-003',action:'拉黑个人',memberId:teams[3].members[0].id,teamId:'T-004',actor:ownerId,reason:teams[3].members[0].submissionBlockedReason,at:ago(4)}
     ]};
   }
   function generate(ownerId='rong',now=Date.now(),eventId='organizer-mock-event'){
@@ -169,7 +167,7 @@
       'od-finance':['现金流研究所','报表侦探队','财务洞察组','勾稽分析队','风险识别队','指标复核组','审计证据队']
     }[eventId]||[];
     const registrationStart=time(event.values.registrationStart),registrationEnd=Math.min(now,time(event.values.registrationEnd));
-    data.teams=data.teams.slice(0,teamNames.length).map((team,i)=>({...team,name:teamNames[i],blacklisted:false,blacklistReason:'',blockedAt:null,
+    data.teams=data.teams.slice(0,teamNames.length).map((team,i)=>({...team,name:teamNames[i],members:team.members.map(m=>({...m,submissionBlocked:false,submissionBlockedReason:''})),
       registeredAt:iso(registrationStart+(registrationEnd-registrationStart)*(i+1)/(teamNames.length+1))}));
     data.anomalies=[];
     data.logs=[];
@@ -252,7 +250,7 @@
     const submitted=new Set(uniqueTasks(data).map(t=>t.teamId));
     const anomaly=new Set(data.anomalies.filter(a=>a.status==='待处理').flatMap(a=>a.teamIds));
     return {teams:teams.length,submittedTeams:teams.filter(t=>submitted.has(t.id)).length,
-      anomalyTeams:teams.filter(t=>anomaly.has(t.id)).length,blacklistedTeams:teams.filter(t=>t.blacklisted).length};
+      anomalyTeams:teams.filter(t=>anomaly.has(t.id)).length,blacklistedMembers:teams.flatMap(t=>t.members).filter(m=>m.submissionBlocked).length};
   }
   function authorize(data,actor){
     validData(data);
@@ -266,17 +264,16 @@
   function log(data,entry,now){
     data.logs.push({...entry,id:'L-'+(data.logs.length+1)+'-'+now,at:iso(now)});
   }
-  function setBlocked(data,teamId,blocked,reason,actor,now=Date.now()){
+  function setBlocked(data,teamId,blocked,reason,actor,now=Date.now(),memberId){
     authorize(data,actor);
-    if(typeof blocked!=='boolean')throw new Error('团队限制状态无效。');
+    if(typeof blocked!=='boolean')throw new Error('个人限制状态无效。');
     if(!Number.isFinite(now))throw new Error('操作时间无效。');
-    const team=teamOf(data,teamId),text=reasonText(reason);
-    if(team.blacklisted===blocked)throw new Error(blocked?'该团队已被拉黑。':'该团队当前没有提交限制。');
-    const next=clone(data),changed=teamOf(next,teamId);
-    changed.blacklisted=blocked;
-    changed.blacklistReason=blocked?text:'';
-    changed.blockedAt=blocked?iso(now):null;
-    log(next,{action:blocked?'拉黑团队':'解除拉黑',teamId,actor,reason:text},now);
+    const member=teamOf(data,teamId).members.find(m=>m.id===memberId),text=reasonText(reason);
+    if(!member)throw new Error('请选择本赛事中的具体个人，不支持团队拉黑。');
+    if(!!member.submissionBlocked===blocked)throw new Error(blocked?'该个人已被拉黑。':'该个人当前没有提交限制。');
+    const next=clone(data),changed=teamOf(next,teamId).members.find(m=>m.id===memberId);
+    changed.submissionBlocked=blocked;changed.submissionBlockedReason=blocked?text:'';changed.blockedAt=blocked?iso(now):null;
+    log(next,{action:blocked?'拉黑个人':'解除个人拉黑',teamId,memberId,actor,reason:text},now);
     return next;
   }
   function resolveAnomaly(data,id,outcome,note,actor,now=Date.now()){
@@ -293,9 +290,11 @@
     log(next,{action:'处理异常',anomalyId:id,actor,reason:outcome+'：'+text},now);
     return next;
   }
-  function submissionPermission(data,teamId,phase='open'){
+  function submissionPermission(data,teamId,phase='open',memberId){
     const team=teamOf(data,teamId);
-    if(team.blacklisted)return '当前团队已被限制提交：'+team.blacklistReason;
+    const member=team.members.find(m=>m.id===memberId);
+    if(!member)return '请选择要校验的个人。';
+    if(member.submissionBlocked)return '当前个人已被限制提交：'+member.submissionBlockedReason;
     if(!['open','correction'].includes(phase))return phase==='closed'?'当前提交窗口已结束，不能新增提交或补正重提。':'任务提交尚未开始，当前仅可查看。';
     return '';
   }

@@ -1,9 +1,11 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const M=require('./organizer-mocks.js');
+const block=(d,id,value,reason,actor,at)=>M.setBlocked(d,id,value,reason,actor,at,d.teams.find(t=>t.id===id).members[0].id);
+const access=(d,id,phase='open',user=d.teams.find(t=>t.id===id).members[0].id)=>M.submissionPermission(d,id,phase,user);
 const now=Date.UTC(2026,10,18,8),data=M.generate('rong',now),before=JSON.stringify(data);
 
-assert.deepEqual(M.stats(data),{teams:8,submittedTeams:6,anomalyTeams:2,blacklistedTeams:1});
+assert.deepEqual(M.stats(data),{teams:8,submittedTeams:6,anomalyTeams:2,blacklistedMembers:1});
 assert.equal(data.tasks.length,16);
 assert.deepEqual(M.teamSummary(data,'T-001'),{taskCount:4,passedCount:2,anomalyCount:1,lastSubmittedAt:new Date(now-0.5*3600000).toISOString()});
 assert.equal(M.teamSummary(data,'T-003').taskCount,0);
@@ -13,33 +15,33 @@ const duplicated={...data,tasks:[...data.tasks,data.tasks.find(t=>t.id==='Task-0
 assert.equal(M.teamSummary(duplicated,'T-001').taskCount,4,'one Task counts once even with multiple versions or repeated rows');
 assert.deepEqual(M.stats(duplicated),M.stats(data));
 
-const blocked=M.setBlocked(data,'T-001',true,'  重复材料核查中  ','rong',now);
+const blocked=block(data,'T-001',true,'  重复材料核查中  ','rong',now);
 assert.equal(JSON.stringify(data),before,'blocking must not mutate the prior store');
-assert.equal(blocked.teams[0].blacklistReason,'重复材料核查中');
-assert.equal(M.stats(blocked).blacklistedTeams,2);
+assert.equal(blocked.teams[0].members[0].submissionBlockedReason,'重复材料核查中');
+assert.equal(M.stats(blocked).blacklistedMembers,2);
 assert.equal(blocked.logs.length,data.logs.length+1);
-assert.match(M.submissionPermission(blocked,'T-001'),/重复材料核查中/);
-assert.match(M.submissionPermission(blocked,'T-001','closed'),/限制提交/,'blacklist reason takes precedence over a closed phase');
-for(const member of blocked.teams[0].members)assert.ok(M.submissionPermission(blocked,'T-001'),member.name+' must share the team restriction');
-assert.equal(M.submissionPermission(blocked,'T-002'),'','other teams keep their own eligibility');
+assert.match(access(blocked,'T-001'),/重复材料核查中/);
+assert.match(access(blocked,'T-001','closed'),/限制提交/,'blacklist reason takes precedence over a closed phase');
+for(const member of blocked.teams[0].members.slice(1))assert.equal(access(blocked,'T-001','open',member.id),'','other members retain submission access');
+assert.equal(access(blocked,'T-002'),'','other teams keep their own eligibility');
 assert.deepEqual(blocked.tasks,data.tasks,'blocking preserves tasks, reviews and historical versions');
 assert.deepEqual(blocked.anomalies,data.anomalies,'blocking does not resolve anomalies');
-assert.throws(()=>M.setBlocked(blocked,'T-001',true,'重复点击','rong',now),/已被拉黑/);
-assert.throws(()=>M.setBlocked(data,'T-001',true,'  ','rong',now),/1～200/);
-assert.throws(()=>M.setBlocked(data,'T-001',true,'长'.repeat(201),'rong',now),/1～200/);
+assert.throws(()=>block(blocked,'T-001',true,'重复点击','rong',now),/已被拉黑/);
+assert.throws(()=>block(data,'T-001',true,'  ','rong',now),/1～200/);
+assert.throws(()=>block(data,'T-001',true,'长'.repeat(201),'rong',now),/1～200/);
 assert.equal(JSON.stringify(data),before,'invalid mutations leave data untouched');
-assert.throws(()=>M.setBlocked(data,'T-001',true,'核查','chen',now),/创建者/);
+assert.throws(()=>block(data,'T-001',true,'核查','chen',now),/创建者/);
 
-const unblocked=M.setBlocked(blocked,'T-001',false,'核查完成，恢复提交','rong',now+60000);
-assert.equal(M.submissionPermission(unblocked,'T-001'),'');
-assert.match(M.submissionPermission(unblocked,'T-001','closed'),/窗口已结束/,'unblocking does not extend a deadline');
-assert.equal(unblocked.teams[0].blockedAt,null);
-assert.equal(unblocked.logs.at(-1).action,'解除拉黑');
+const unblocked=block(blocked,'T-001',false,'核查完成，恢复提交','rong',now+60000);
+assert.equal(access(unblocked,'T-001'),'');
+assert.match(access(unblocked,'T-001','closed'),/窗口已结束/,'unblocking does not extend a deadline');
+assert.equal(unblocked.teams[0].members[0].blockedAt,null);
+assert.equal(unblocked.logs.at(-1).action,'解除个人拉黑');
 assert.equal(unblocked.anomalies[0].status,'待处理','unblocking does not automatically handle an anomaly');
 
 const resolved=M.resolveAnomaly(blocked,'A-001','排除异常','核查为授权共用的示例材料。','rong',now+120000);
 assert.equal(M.stats(resolved).anomalyTeams,0,'a shared anomaly resolves for both linked teams');
-assert.equal(resolved.teams[0].blacklisted,true,'resolving an anomaly does not unblock the team');
+assert.equal(resolved.teams[0].members[0].submissionBlocked,true,'resolving an anomaly does not unblock the team');
 assert.deepEqual(resolved.tasks,blocked.tasks,'anomaly handling does not alter review results');
 assert.equal(blocked.anomalies[0].status,'待处理');
 assert.throws(()=>M.resolveAnomaly(data,'A-001','排除异常','  ','rong',now),/处理说明/);
@@ -52,7 +54,7 @@ assert.equal(data.ownerId,'rong');
 assert.notEqual(other.teams,data.teams);
 other.teams[0].name='另一份演示';
 assert.equal(data.teams[0].name,'极光数据队','owner-scoped fixtures do not share mutable objects');
-assert.throws(()=>M.setBlocked(other,'T-001',true,'核查','rong',now),/创建者/);
+assert.throws(()=>block(other,'T-001',true,'核查','rong',now),/创建者/);
 
 for(const task of data.tasks)for(const v of task.versions){
   assert.equal(v.revision>=1,true);
@@ -102,8 +104,8 @@ assert.equal(M.submissionPhase(active,Date.parse(v.submissionStart)-1),'before')
 assert.equal(M.submissionPhase(active,Date.parse(v.submissionStart)),'open');
 assert.equal(M.submissionPhase(active,Date.parse(v.submissionEnd)),'correction');
 assert.equal(M.submissionPhase(active,Date.parse(v.correctionEnd)),'closed');
-assert.match(M.submissionPermission(data,'T-001','before'),/尚未开始/);
-assert.equal(M.submissionPermission(data,'T-001','correction'),'','the caller still decides whether this is a permitted correction, not a new Task');
+assert.match(access(data,'T-001','before'),/尚未开始/);
+assert.equal(access(data,'T-001','correction'),'','the caller still decides whether this is a permitted correction, not a new Task');
 
 const expectedCounts=[[8,16],[5,0],[4,0],[6,12],[7,14],[0,0],[0,0],[0,0]];
 const generated=events.map(e=>M.generate('rong',now,e.id));
@@ -128,15 +130,15 @@ for(let i=0;i<generated.length;i++){
   }
   if(!current.tasks.length){
     assert.equal(current.anomalies.length,0);
-    assert.equal(M.stats(current).blacklistedTeams,0);
+    assert.equal(M.stats(current).blacklistedMembers,0);
   }
 }
 assert.ok(generated[3].tasks.some(t=>Date.parse(t.submittedAt)>=Date.parse(generated[3].event.values.submissionEnd)),'the correction-phase example includes a genuine correction version');
 assert.ok(generated[4].tasks.every(t=>['审核通过','已录用','审核不通过'].includes(t.status)),'completed event examples have settled review outcomes');
-const changedScience=M.setBlocked(generated[3],'T-001',true,'核查科学推理材料','rong',now);
-assert.equal(changedScience.teams[0].blacklisted,true);
-assert.equal(generated[3].teams[0].blacklisted,false);
-assert.equal(generated[4].teams[0].blacklisted,false,'identical team identifiers in another event remain independent');
+const changedScience=block(generated[3],'T-001',true,'核查科学推理材料','rong',now);
+assert.equal(changedScience.teams[0].members[0].submissionBlocked,true);
+assert.equal(generated[3].teams[0].members[0].submissionBlocked,false);
+assert.equal(generated[4].teams[0].members[0].submissionBlocked,false,'identical team identifiers in another event remain independent');
 assert.throws(()=>M.generate('rong',now,'not-an-event'),/赛事不存在/);
 assert.throws(()=>M.listEvents('',now),/演示身份/);
 assert.equal(M.listEvents('chen',now)[0].ownerId,'chen');

@@ -22,7 +22,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(typeof window==='undefined'||typeof document==='undefined')return;
   let dialog=null,opener=null,onContinue=null;
-  const qr=()=>'<div class="ec-qr-frame">'+qrImage(216)+'</div><span class="ec-demo-tag">演示二维码 · 非真实联系方式</span>';
+  const qr=(showTag=true)=>'<div class="ec-qr-frame">'+qrImage(216)+'</div>'+(showTag?'<span class="ec-demo-tag">演示二维码 · 非真实联系方式</span>':'');
   function closeContact(){if(dialog?.open)dialog.close();}
   function show(kind,html,options={}){
     if(!dialog){
@@ -32,7 +32,7 @@
       dialog.addEventListener('close',()=>{onContinue=null;if(opener?.isConnected)opener.focus();});
     }
     opener=document.activeElement;onContinue=options.onContinue||null;dialog.dataset.kind=kind;
-    dialog.innerHTML='<button type="button" class="ec-dialog-close" aria-label="关闭企业微信提示" data-event-contact-close>×</button>'+html;
+    dialog.innerHTML='<button type="button" class="ec-dialog-close" aria-label="关闭联系提示" data-event-contact-close>×</button>'+html;
     if(!dialog.open)dialog.showModal();
     dialog.querySelector('[data-event-contact-close]').focus();
     return true;
@@ -43,11 +43,10 @@
     return show('group','<div class="ec-dialog-heading"><span class="ec-status '+(registered?'ec-success':'')+'">'+(registered?'报名成功':'赛事交流群')+'</span><h2 id="ec-dialog-title">'+(registered?'加入赛事企业微信群':'扫码加入赛事交流群')+'</h2><p class="ec-event-name">'+E(title(c))+'</p><p class="ec-dialog-description">'+(registered?'请使用企业微信扫码入群，及时获取赛事通知与规则答疑。':'比赛期间可从赛事详情页随时找到本入口，扫码入群查看通知、参与交流。')+'</p></div><div class="ec-qr-block">'+qr()+'<p>使用企业微信扫码</p></div>'+(registered?'<p class="ec-after-register">报名已完成。入群后请按赛事要求继续完成组队；扫码状态不会由本 Demo 自动校验。</p>':'')+'<div class="ec-dialog-actions"><button type="button" class="button dark" '+(options.onContinue?'data-ec-continue':'data-event-contact-close')+'>'+E(options.continueLabel||(registered?'继续组队':'我知道了'))+'</button></div>',options);
   };
   api.openSubmissionBlock=function(message){
-    return show('submission-block','<div class="ec-dialog-heading"><h2 id="ec-dialog-title">提交已拦截</h2><p class="ec-dialog-description ec-submission-warning">'+E(message)+'详情加入企业微信联系工作人员。</p></div><div class="ec-qr-block">'+qr()+'<p>使用企业微信扫码</p></div><div class="ec-dialog-actions"><button type="button" class="button dark" data-event-contact-close>我知道了</button></div>');
+    const code='<div class="ec-qr-frame">'+qrImage(216).replace('企业微信演示二维码','微信联系二维码')+'</div>';
+    return show('submission-block','<div class="ec-dialog-heading"><h2 id="ec-dialog-title">提交已拦截</h2><p class="ec-dialog-description ec-submission-warning">'+E(message||'你已被本赛事拉黑，无法提交或重新提交数据。')+'详情请使用微信联系工作人员。</p></div><div class="ec-qr-block">'+code+'<p>使用微信扫码</p></div><div class="ec-dialog-actions"><button type="button" class="button dark" data-event-contact-close>我知道了</button></div>');
   };
-  api.openAppeal=function({eventTitle,teamName,reason}={}){
-    return show('appeal','<div class="ec-dialog-heading"><span class="ec-status ec-blocked">提交已拦截</span><h2 id="ec-dialog-title">当前团队已被拉黑</h2><p class="ec-event-name">'+E(eventTitle||'当前赛事')+(teamName?' · '+E(teamName):'')+'</p><p class="ec-dialog-description">本赛事的新提交与补正重提均已暂停。请联系企业微信申诉，由主办方核查处理。</p></div>'+(reason?'<div class="ec-block-reason"><strong>拉黑原因</strong><p>'+E(reason)+'</p></div>':'')+'<div class="ec-qr-block">'+qr()+'<p>请使用企业微信扫码联系申诉</p></div><p class="ec-after-register">申诉时请提供赛事名称、团队名称和相关说明。已有提交与草稿保留；申诉后仍需等待主办方解除限制。</p><div class="ec-dialog-actions"><button type="button" class="button dark" data-event-contact-close>我知道了</button></div>');
-  };
+  api.openAppeal=function(){return api.openSubmissionBlock('你已被本赛事拉黑，无法提交或重新提交数据。');};
   window.EventContact=api;
   function resolve(id){
     const organizer=window.OrganizerDemoStore;
