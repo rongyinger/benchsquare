@@ -230,7 +230,9 @@ function openVerification(competitionId='',registration){
    <button class="button dark" type="submit">立即核验</button>
   </form>
  </div>`);
- if(registration)verificationContinuations.set($('#expert-identity-form'),registration);
+ const form=$('#expert-identity-form');
+ if(registration)verificationContinuations.set(form,registration);
+ bindIdentityForm(form);
  $('#expert-verification-title').focus();
 }
 
@@ -271,17 +273,55 @@ function openRegistrationResume({id,actor,onBack,canSubmit,onSubmit}){
  showResume();
 }
 
-function submitIdentity(form){
- const user=api.uid(),error=form.querySelector('.error');
- if(form.dataset.actor!==user||sessionStorage.getItem('expert-demo-out')==='yes'){
-  error.textContent='演示身份已变化，请重新进入个人资料。';
-  return;
+function bindIdentityForm(form){
+ const send=form.querySelector('[data-identity-send]');
+ const status=form.querySelector('#expert-identity-sms-status');
+ const error=form.querySelector('.error');
+ const {phone,smsCode}=form.elements;
+ let challenge=null,resendAt=0;
+ const active=()=>form.isConnected&&$('#dialog').open&&form.dataset.actor===api.uid()&&sessionStorage.getItem('expert-demo-out')!=='yes';
+ function updateSendButton(){
+  if(!active())return;
+  const seconds=Math.ceil((resendAt-Date.now())/1000);
+  send.disabled=seconds>0;
+  send.textContent=seconds>0?`${seconds} 秒后重发`:'重新发送验证码';
+  if(seconds>0)setTimeout(updateSendButton,Math.min(1000,resendAt-Date.now()));
  }
+ send.addEventListener('click',()=>{
+  const now=Date.now();
+  if(!active()||now<resendAt)return;
+  const number=phone.value.trim();
+  error.textContent=identity.phoneError(number);
+  if(error.textContent){phone.focus();return;}
+  challenge=identity.issueSms(number,now);
+  resendAt=now+identity.smsCooldownMs;
+  smsCode.value='';
+  status.textContent=`演示验证码 ${challenge.code}，5 分钟内有效。`;
+  updateSendButton();
+  smsCode.focus();
+ });
+ form.addEventListener('input',e=>{
+  error.textContent='';
+  if(e.target!==phone||!challenge||phone.value.trim()===challenge.phone)return;
+  challenge=null;
+  smsCode.value='';
+  status.textContent='手机号已更改，请重新发送验证码。';
+ });
+ form.addEventListener('submit',e=>{
+  e.preventDefault();
+  if(active())submitIdentity(form,challenge);
+ });
+}
+
+function submitIdentity(form,challenge){
+ const user=api.uid(),error=form.querySelector('.error');
  if(identity.verifiedAt(api.db,user))return finishIdentity(form);
  const data=new FormData(form);
  const name=String(data.get('realName')||'').trim();
  const number=String(data.get('idNumber')||'').trim().toUpperCase();
- error.textContent=identity.verifyDemo(name,number);
+ const phone=String(data.get('phone')||'').trim();
+ const smsCode=String(data.get('smsCode')||'').trim();
+ error.textContent=identity.verifyDemo(name,number,phone,smsCode,challenge);
  if(error.textContent)return;
  const previous=api.db.accounts[user];
  api.db.accounts[user]={...previous,realNameVerifiedAt:Date.now()};
@@ -294,13 +334,12 @@ function submitIdentity(form){
  finishIdentity(form);
 }
 
-document.addEventListener('submit',e=>{
- if(e.target.id!=='expert-identity-form')return;
- e.preventDefault();
- e.stopImmediatePropagation();
- submitIdentity(e.target);
-},true);
-$('#dialog').addEventListener('close',()=>{if(!$('#dialog').open)$('#expert-identity-form')?.reset();});
+$('#dialog').addEventListener('close',()=>{
+ if($('#dialog').open)return;
+ $('#expert-identity-form')?.reset();
+ const status=$('#expert-identity-sms-status');
+ if(status)status.textContent='';
+});
 window.expertProfile={openVerification};
 api.openResume=openResume;
 api.openRegistrationResume=openRegistrationResume;

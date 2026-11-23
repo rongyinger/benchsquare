@@ -29,6 +29,10 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   const finishVerification=async()=>{
    await identity.getByLabel('姓名',{exact:true}).fill('演示用户');
    await identity.getByLabel('身份证号码',{exact:true}).fill('000000200001010010');
+   await identity.getByLabel('手机号',{exact:true}).fill('13800000000');
+   await button(identity,'发送验证码').click();
+   const code=(await identity.getByRole('status').innerText()).match(/演示验证码 (\d{6})/)[1];
+   await identity.getByLabel('短信验证码',{exact:true}).fill(code);
    await button(identity,'立即核验').click();
   };
   const uploadResume=async file=>{

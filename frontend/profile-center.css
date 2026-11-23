@@ -25,6 +25,12 @@
 .expert-identity-heading .badge{font-size:13px}
 #expert-identity-form .field{font-size:15px;font-weight:600;color:#374151;margin:16px 0}
 #expert-identity-form .field input{min-height:46px;font-size:16px;font-weight:400}
+.expert-identity-sms{display:flex;align-items:stretch;gap:8px;margin-top:8px}
+#expert-identity-form .expert-identity-sms input{min-width:0;flex:1;margin-top:0}
+.expert-identity-sms .button{flex:none;white-space:nowrap;font-size:13px;padding-inline:12px}
+.expert-identity-sms-status{font-size:14px;color:#4b5563;margin:0}
+.expert-identity-sms-status:empty{display:none}
+#expert-identity-form .expert-card-note{margin:8px 0 16px;overflow-wrap:anywhere}
 #expert-identity-form .error{font-size:14px}
 #expert-identity-form .error:empty{display:none}
 #expert-identity-form [type="submit"]{min-height:44px;font-size:15px}
