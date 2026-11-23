@@ -8,17 +8,14 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   const context=await browser.newContext(),page=await context.newPage();
   const base=process.env.DEMO_BASE||'http://127.0.0.1:4173/frontend/';
   const cid='workbench-blocked-demo',reason='你已被本赛事拉黑，无法提交或重新提交数据。';
-  const warning=reason+'详情请使用微信联系工作人员。';
+  const warning=reason+'详情请联系赛事工作人员。';
   const blockedDialog=async editor=>{
    const dialog=editor.getByRole('dialog',{name:'提交已拦截',exact:true});
    const message=dialog.getByText(warning,{exact:true});
    await message.waitFor();
    assert.equal(await message.evaluate(node=>getComputedStyle(node).color),'rgb(180, 35, 24)');
-   const qr=dialog.getByRole('img',{name:/微信联系二维码/});
-   assert.equal(await qr.getAttribute('src'),'assets/wecom-demo.svg');
-   await qr.evaluate(image=>image.decode());
-   assert.equal(await dialog.locator('.ec-demo-tag').count(),0);
-   assert.match(await dialog.innerText(),/使用微信扫码/);
+   assert.equal(await dialog.locator('img, .ec-qr-block').count(),0);
+   assert.doesNotMatch(await dialog.innerText(),/扫码|二维码/);
    return dialog;
   };
   await page.goto(base+'#mine');
@@ -55,6 +52,6 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   await editor.locator('[data-format="question"]').click();
   await editor.locator('#submission-block').waitFor();
   assert.equal(await submit.isDisabled(),true);
-  console.log('Submission block: exact red text and QR dialog, no draft picker, focus restoration, editor guard, and draft persistence passed.');
+  console.log('Submission block: text-only warning, no draft picker, focus restoration, editor guard, and draft persistence passed.');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

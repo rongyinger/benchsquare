@@ -26,7 +26,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   const gotoTeams=async(event='organizer-mock-event')=>{await page.goto(base+'#organizer-teams/'+event);await page.locator('.od-breadcrumb a[href="#organizer-teams/'+event+'"]').waitFor();await page.locator('#od-results').waitFor();};
   const gotoTeam=async(id='T-001',event='organizer-mock-event')=>{await page.goto(base+'#organizer-teams/'+event+'/'+id);await page.locator('.od-breadcrumb a[href="#organizer-teams/'+event+'"]').waitFor();await page.locator('.od-heading p').filter({hasText:id}).waitFor();await page.locator('.od-team-summary').waitFor();};
   const setBlock=async(blocked,reason)=>{
-    await page.locator('[data-od="'+(blocked?'block':'unblock')+'"]').click();
+    await page.locator('[data-od="'+(blocked?'block':'unblock')+'"][data-member="T-001-member-1"]').click();
     await page.locator('#od-block-form textarea').fill(reason);
     await page.locator('#od-block-form button[type="submit"]').click();
     await page.locator('#od-block-form').waitFor({state:'hidden'});
@@ -34,7 +34,9 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   const simulate=async(kind)=>{
     await page.locator('[data-od="simulate"][data-kind="'+kind+'"]').click();
     if(await page.locator('#event-contact-dialog[open]').count()){
-      assert.match(await page.locator('#event-contact-dialog').innerText(),/已被拉黑[\s\S]*企业微信申诉/);
+      const dialog=page.locator('#event-contact-dialog');
+      assert.match(await dialog.innerText(),/已被本赛事拉黑[\s\S]*联系赛事工作人员/);
+      assert.equal(await dialog.locator('img').count(),0);
       await page.locator('[data-event-contact-close]').first().click();
     }
     return page.locator('#od-simulation-result').innerText();
@@ -185,7 +187,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     for(const kind of ['new','correction'])assert.match(await simulate(kind),/已拒绝[\s\S]*已结束/);
     await gotoTeams();
     assert.equal(await teamRows().count(),8);
-    assert.deepEqual(await page.locator('.od-metric strong').allTextContents(),['8支团队','6支团队','2支团队','1支团队']);
+    assert.deepEqual(await page.locator('.od-metric strong').allTextContents(),['8支团队','6支团队','2支团队','1人']);
     assert.equal((await read()).tasks.length,16);
     await page.goto(base+'#organizer-teams/T-001');await page.locator('.od-team-summary').waitFor();
     assert.match(await page.locator('.od-heading h1').innerText(),/极光数据队/);
@@ -279,7 +281,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     assert.equal((await read()).teams[0].members[0].submissionBlocked,false);
     await page.locator('[data-od="close-dialog"]').click();
     await page.locator('[data-od="block"]').first().click();
-    await page.locator('#od-block-form textarea').fill('测试拉黑：核查期间暂停团队提交。');
+    await page.locator('#od-block-form textarea').fill('测试拉黑：核查期间暂停该个人提交。');
     await page.locator('#od-block-form button[type="submit"]').click();
     await page.locator('#od-block-form').waitFor({state:'hidden'});
     assert.equal((await read()).teams[0].members[0].submissionBlocked,true);
@@ -317,7 +319,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     });
     await gotoTeams();await page.locator('[data-od="reset"]').click();
     await page.locator('[data-od="confirm-reset"]').click();await page.locator('#od-results tbody').waitFor();
-    assert.deepEqual(await page.locator('.od-metric strong').allTextContents(),['8支团队','6支团队','2支团队','1支团队']);
+    assert.deepEqual(await page.locator('.od-metric strong').allTextContents(),['8支团队','6支团队','2支团队','1人']);
     const afterReset=await page.evaluate(()=>({state:localStorage.getItem('ale-frontend-v1'),draft:localStorage.getItem(DataItems.key)}));
     assert.deepEqual(afterReset,preserved,'demo reset preserves the original event and draft stores');
     assert.equal((await read('od-chart')).teams[0].members[0].submissionBlocked,true,'resetting one event preserves another event black list');
@@ -389,6 +391,6 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
       assert.equal(await legacyPage.locator('.od-participant').count(),0);
     }finally{await legacyContext.close();}
     assert.deepEqual(errors,[]);
-    console.log('Organizer demo browser passed: grouped published/pending rows, no action column, home/manage navigation, publishing progress, 8 event lifecycle scenarios, direct center rows, stage filters, event state/reset/simulator isolation, 8 active teams, filters, shared full-version details, ALE content, immutable submission/review timeline, all-member block/unblock, deadline denial, persistence, scoped reset, owner isolation, mobile and existing navigation.');
+    console.log('Organizer demo browser passed: grouped published/pending rows, no action column, home/manage navigation, publishing progress, 8 event lifecycle scenarios, direct center rows, stage filters, event state/reset/simulator isolation, 8 active teams, filters, shared full-version details, ALE content, immutable submission/review timeline, personal block/unblock, deadline denial, persistence, scoped reset, owner isolation, mobile and existing navigation.');
   }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

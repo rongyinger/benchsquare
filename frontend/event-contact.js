@@ -22,7 +22,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(typeof window==='undefined'||typeof document==='undefined')return;
   let dialog=null,opener=null,onContinue=null;
-  const qr=(showTag=true)=>'<div class="ec-qr-frame">'+qrImage(216)+'</div>'+(showTag?'<span class="ec-demo-tag">演示二维码 · 非真实联系方式</span>':'');
+  const qr=()=>'<div class="ec-qr-frame">'+qrImage(216)+'</div><span class="ec-demo-tag">演示二维码 · 非真实联系方式</span>';
   function closeContact(){if(dialog?.open)dialog.close();}
   function show(kind,html,options={}){
     if(!dialog){
@@ -43,8 +43,7 @@
     return show('group','<div class="ec-dialog-heading"><span class="ec-status '+(registered?'ec-success':'')+'">'+(registered?'报名成功':'赛事交流群')+'</span><h2 id="ec-dialog-title">'+(registered?'加入赛事企业微信群':'扫码加入赛事交流群')+'</h2><p class="ec-event-name">'+E(title(c))+'</p><p class="ec-dialog-description">'+(registered?'请使用企业微信扫码入群，及时获取赛事通知与规则答疑。':'比赛期间可从赛事详情页随时找到本入口，扫码入群查看通知、参与交流。')+'</p></div><div class="ec-qr-block">'+qr()+'<p>使用企业微信扫码</p></div>'+(registered?'<p class="ec-after-register">报名已完成。入群后请按赛事要求继续完成组队；扫码状态不会由本 Demo 自动校验。</p>':'')+'<div class="ec-dialog-actions"><button type="button" class="button dark" '+(options.onContinue?'data-ec-continue':'data-event-contact-close')+'>'+E(options.continueLabel||(registered?'继续组队':'我知道了'))+'</button></div>',options);
   };
   api.openSubmissionBlock=function(message){
-    const code='<div class="ec-qr-frame">'+qrImage(216).replace('企业微信演示二维码','微信联系二维码')+'</div>';
-    return show('submission-block','<div class="ec-dialog-heading"><h2 id="ec-dialog-title">提交已拦截</h2><p class="ec-dialog-description ec-submission-warning">'+E(message||'你已被本赛事拉黑，无法提交或重新提交数据。')+'详情请使用微信联系工作人员。</p></div><div class="ec-qr-block">'+code+'<p>使用微信扫码</p></div><div class="ec-dialog-actions"><button type="button" class="button dark" data-event-contact-close>我知道了</button></div>');
+    return show('submission-block','<div class="ec-dialog-heading"><h2 id="ec-dialog-title">提交已拦截</h2><p class="ec-dialog-description ec-submission-warning">'+E(message||'你已被本赛事拉黑，无法提交或重新提交数据。')+'<br>详情请联系赛事工作人员。</p></div><div class="ec-dialog-actions"><button type="button" class="button dark" data-event-contact-close>我知道了</button></div>');
   };
   api.openAppeal=function(){return api.openSubmissionBlock('你已被本赛事拉黑，无法提交或重新提交数据。');};
   window.EventContact=api;
