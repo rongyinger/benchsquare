@@ -16,9 +16,9 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   const upload=dialog.locator('#expert-resume-form');
   const identity=dialog.locator('#expert-identity-form');
   const button=(scope,name)=>scope.getByRole('button',{name,exact:true});
-  const openVerification=button(signup,'点击这里完成实名认证');
-  const openResume=button(signup,'前往上传简历');
-  const confirm=button(signup,'确认报名');
+  const next=button(signup,'下一步');
+  const confirm=button(upload,'确认提交');
+  const rules=signup.getByRole('checkbox');
   const start=()=>button(page.locator('.detail-heading'),'报名参加比赛').click();
   const closeDialog=()=>button(dialog,'关闭').click();
   const read=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('ale-frontend-v1')).participation);
@@ -35,8 +35,7 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
    await upload.getByLabel('简历文件').setInputFiles(file);
    await upload.locator('[type="submit"]').click();
   };
-  const finishRegistration=async()=>{
-   await button(signup,'确认报名').click();
+  const continueToTeam=async()=>{
    const group=page.locator('#event-contact-dialog[open]');
    if(await page.evaluate(()=>Boolean(window.EventContact))){
     await group.waitFor();
@@ -47,44 +46,47 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
 
   await page.goto(base+'#competition/'+first);
   await start();
-  await signup.waitFor();
-  await signup.getByText('完成实名认证并上传参赛简历。').waitFor();
-  await openVerification.waitFor();
-  await openResume.waitFor();
-  assert.equal(await confirm.isEnabled(),false);
-  assert.equal(await confirm.getAttribute('aria-describedby'),'registration-verification-hint registration-resume-hint');
-  await signup.getByRole('checkbox').check();
-  await openVerification.click();
-  await finishVerification();
+  await signup.getByText('提交参赛简历并完成实名认证。').waitFor();
+  await next.click();
+  assert.equal(await upload.count(),0);
+  await rules.check();
+  await next.click();
   await upload.waitFor();
-  assert.equal((await read()).regs[first].rong,undefined);
-  assert.ok((await read()).accounts.rong.realNameVerifiedAt);
+  assert.equal(await confirm.isEnabled(),false);
+  assert.equal(await identity.count(),0);
+  await button(dialog,'返回报名规则').click();
+  assert.equal(await rules.isChecked(),true);
+  await next.click();
 
   await uploadResume({name:'简历.txt',mimeType:'text/plain',buffer:Buffer.from('unsupported')});
   await upload.getByRole('alert').getByText('请上传 PDF、DOC 或 DOCX 格式的简历。').waitFor();
-  assert.equal(await upload.getByRole('button',{name:'继续报名'}).count(),0);
+  assert.equal(await confirm.isEnabled(),false);
   await uploadResume(resume);
-  await button(upload,'继续报名').click();
-  await signup.waitFor();
-  assert.equal(await signup.getByRole('checkbox').isChecked(),true);
+  await dialog.getByText(resume.name,{exact:true}).waitFor();
+  await button(dialog,'预览简历').click();
+  await dialog.getByTitle('简历 PDF 预览').waitFor();
   assert.equal((await read()).regs[first].rong,undefined,'uploading alone must not register the user');
-
-  // The form reads the current attachment again when the user confirms.
+  await confirm.click();
+  await identity.waitFor();
+  assert.equal((await read()).accounts.rong?.realNameVerifiedAt,undefined);
+  assert.equal((await read()).regs[first].rong,undefined);
+  await button(dialog,'返回我的简历').click();
+  await dialog.getByText(resume.name,{exact:true}).waitFor();
+  await confirm.click();
+  await identity.waitFor();
+  // The form reads the current attachment again when verification resumes submission.
   await page.evaluate(()=>{
    const get=ResumeFiles.get;
    ResumeFiles.get=actor=>{ResumeFiles.get=get;return Promise.resolve(null);};
   });
-  await button(signup,'确认报名').click();
-  await button(upload,'继续报名').waitFor();
+  await finishVerification();
+  await upload.getByText('请上传参赛简历后再提交。').waitFor();
   assert.equal((await read()).regs[first].rong,undefined);
-  await button(upload,'继续报名').click();
-  await signup.waitFor();
-  await signup.getByRole('checkbox').uncheck();
-  await button(signup,'确认报名').click();
-  assert.equal((await read()).regs[first].rong,undefined);
-  await signup.getByRole('checkbox').check();
-  await finishRegistration();
+  assert.ok((await read()).accounts.rong.realNameVerifiedAt);
+  await confirm.click();
+  await continueToTeam();
   assert.ok((await read()).regs[first].rong);
+  await page.locator('[data-event-community] .ec-community-qr img').waitFor();
 
   await profile();
   await dialog.getByText(resume.name,{exact:true}).waitFor();
@@ -106,10 +108,11 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
    return {name:file.name,text:await file.text(),otherResume:await ResumeFiles.get('xu')};
   }),{name:updated.name,text:resume.buffer.toString(),otherResume:null});
   await start();
-  await signup.waitFor();
-  assert.equal(await button(signup,'确认报名').isEnabled(),true);
-  await signup.getByRole('checkbox').check();
-  await finishRegistration();
+  await rules.check();
+  await next.click();
+  await dialog.getByText(updated.name,{exact:true}).waitFor();
+  await confirm.click();
+  await continueToTeam();
 
   await page.locator('[data-expert="demo"]').click();
   await page.locator('#participation-user').selectOption('xu');
@@ -117,29 +120,22 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   await page.setViewportSize({width:390,height:844});
   await page.goto(base+'#competition/'+first);
   await start();
-  await signup.getByRole('checkbox').check();
-  await openResume.click();
+  await rules.check();
+  await next.click();
   await upload.waitFor();
   assert.equal((await read()).accounts.xu?.realNameVerifiedAt,undefined);
-  assert.equal(await upload.getByRole('button',{name:'继续报名'}).count(),0);
+  assert.equal(await confirm.isEnabled(),false);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await uploadResume(resume);
-  await button(upload,'继续报名').click();
-  await openVerification.waitFor();
-  assert.equal(await openResume.count(),0);
-  assert.equal(await confirm.isEnabled(),false);
-  assert.equal(await signup.getByRole('checkbox').isChecked(),true);
-  await openVerification.click();
-  await finishVerification();
-  await signup.waitFor();
-  assert.equal(await confirm.isEnabled(),true);
+  await confirm.click();
+  await identity.waitFor();
   await closeDialog();
   assert.equal((await read()).regs[first].xu,undefined);
   await page.goto(base+'#profile/resume');
   await upload.waitFor();
   await uploadResume(updated);
   await dialog.getByText(updated.name,{exact:true}).waitFor();
-  assert.equal(await upload.getByRole('button',{name:'继续报名'}).count(),0);
+  assert.equal(await confirm.count(),0);
   assert.equal((await read()).regs[first].xu,undefined);
   assert.deepEqual(errors,[]);
   console.log('Competition registration passed: identity and resume gates, validation, confirmation, persistence, reuse, account isolation and mobile.');

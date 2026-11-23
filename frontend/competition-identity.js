@@ -2,6 +2,7 @@
   'use strict';
 
   const demoId='identity-verification-demo';
+  const verifiedDemoUser='zhou';
   const example=Object.freeze({realName:'演示用户',idNumber:'000000200001010010'});
   const legacyRequirement=c=>{
     const method=(c?.values||c?.config)?.identityVerification;
@@ -42,8 +43,11 @@
   }
 
   function seedDemo(){
+    const accounts=state.participation.accounts ||= {};
+    const account=accounts[verifiedDemoUser] ||= {};
+    account.realNameVerifiedAt ||= Date.now();
     const existing=state.competitions.find(c=>c.id===demoId);
-    const description='体验赛事报名与组队。请先在个人资料完成实名认证并上传简历。';
+    const description='体验确认参赛规则、提交简历、实名认证与组队。';
     if(existing)existing.values.description=description;
     const now=Date.now();
     if(existing&&(Date.parse(existing.values.registrationEnd)>now||Object.keys(state.participation.regs[demoId]||{}).length))return;
@@ -67,7 +71,7 @@
     state.competitions.push({id:demoId,stage:'已发布',ownerId:'chen',version:1,values});
   }
 
-  const api={demoId,legacyRequirement,verifiedAt,migrate,enrollmentEligible,verifyDemo,fields,seedDemo};
+  const api={demoId,verifiedDemoUser,legacyRequirement,verifiedAt,migrate,enrollmentEligible,verifyDemo,fields,seedDemo};
   if(typeof module!=='undefined')module.exports=api;
   else root.CompetitionIdentity=api;
 })(typeof window==='undefined'?globalThis:window);

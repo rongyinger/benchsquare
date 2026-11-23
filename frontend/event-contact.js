@@ -16,12 +16,13 @@
   }
   const title=c=>c?.values?.name||c?.title||'当前赛事';
   const chatIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg>';
-  function entry(c){return communityAvailable(c)?'<section class="ec-community" data-event-community="'+E(c.id)+'"><span class="ec-community-icon">'+chatIcon+'</span><div><h2>赛事交流群</h2><p>扫码加入企业微信群，获取赛事通知、规则答疑与参赛交流。</p></div><button type="button" class="button ec-group-button" data-ec-group="'+E(c.id)+'">企业微信入群 <span aria-hidden="true">↗</span></button></section>':'';}
+  const qrImage=size=>'<img src="assets/wecom-demo.svg" width="'+size+'" height="'+size+'" alt="企业微信演示二维码">';
+  function entry(c,registered=false){return communityAvailable(c)?'<section class="ec-community" data-event-community="'+E(c.id)+'"><span class="ec-community-icon">'+chatIcon+'</span><div><h2>赛事交流群</h2><p>扫码加入企业微信群，获取赛事通知、规则答疑与参赛交流。</p></div>'+(registered?'<span class="ec-community-qr">'+qrImage(96)+'<small>演示二维码</small></span>':'')+'<button type="button" class="button ec-group-button" data-ec-group="'+E(c.id)+'">企业微信入群 <span aria-hidden="true">↗</span></button></section>':'';}
   const api={time,communityAvailable,entry};
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(typeof window==='undefined'||typeof document==='undefined')return;
   let dialog=null,opener=null,onContinue=null;
-  const qr=()=>'<div class="ec-qr-frame"><img src="assets/wecom-demo.svg" width="216" height="216" alt="企业微信演示二维码，仅为测试占位，不会加入真实群或联系真实人员"></div><span class="ec-demo-tag">演示二维码 · 非真实联系方式</span>';
+  const qr=()=>'<div class="ec-qr-frame">'+qrImage(216)+'</div><span class="ec-demo-tag">演示二维码 · 非真实联系方式</span>';
   function closeContact(){if(dialog?.open)dialog.close();}
   function show(kind,html,options={}){
     if(!dialog){
@@ -49,19 +50,24 @@
   };
   window.EventContact=api;
   function resolve(id){
+    const organizer=window.OrganizerDemoStore;
     try{
-      if(window.OrganizerDemoStore&&window.OrganizerMocks?.listEvents(window.OrganizerDemoStore.owner()).some(c=>c.id===id))return window.OrganizerDemoStore.read(id).event;
-      return typeof find==='function'?find(id):null;
-    }catch{return null;}
+      if(organizer&&window.OrganizerMocks?.listEvents(organizer.owner()).some(c=>c.id===id)){
+        const data=organizer.read(id);
+        return {event:data.event,registered:Boolean(data.participantRegistration)};
+      }
+      const event=typeof find==='function'?find(id):null;
+      return {event,registered:Boolean(event&&typeof registration==='function'&&registration(event))};
+    }catch{return {};}
   }
   function mount(){
     const main=document.querySelector('#main');if(!main)return;
     main.querySelectorAll('[data-event-community]').forEach(el=>el.remove());
     const [root,id]=location.hash.slice(1).split('/');if(root!=='competition'||!id)return;
-    const c=resolve(id);if(!communityAvailable(c))return;
+    const {event,registered}=resolve(id);if(!communityAvailable(event))return;
     const anchor=main.querySelector('.op-summary')||main.querySelector('.detail-heading');
-    if(anchor)anchor.insertAdjacentHTML('afterend',entry(c));
+    if(anchor)anchor.insertAdjacentHTML('afterend',entry(event,registered&&sessionStorage.getItem('expert-demo-out')!=='yes'));
   }
-  document.addEventListener('click',e=>{const button=e.target.closest('[data-ec-group]');if(!button)return;e.preventDefault();e.stopImmediatePropagation();const c=resolve(button.dataset.ecGroup);if(!api.openGroup(c)){mount();if(typeof toast==='function')toast('赛事交流群入口当前未开放。');}},true);
+  document.addEventListener('click',e=>{const button=e.target.closest('[data-ec-group]');if(!button)return;e.preventDefault();e.stopImmediatePropagation();const {event}=resolve(button.dataset.ecGroup);if(!api.openGroup(event)){mount();if(typeof toast==='function')toast('赛事交流群入口当前未开放。');}},true);
   if(typeof render==='function'&&document.querySelector('#main')){const previous=render;render=function(){previous();mount();};render();}
 })();

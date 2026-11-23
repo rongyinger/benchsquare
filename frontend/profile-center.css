@@ -39,6 +39,10 @@
 }
 .expert-resume-current .badge{flex-shrink:0;font-size:13px}
 .expert-resume-filename{overflow-wrap:anywhere}
+.expert-resume-current [data-resume-preview]{flex-shrink:0;margin-left:auto}
+.expert-resume-preview{margin-top:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
+.expert-resume-preview iframe{display:block;width:100%;height:min(45dvh,400px);border:0;background:#fff}
+.expert-resume-preview a{display:inline-block;margin-top:8px;text-decoration:underline}
 #expert-resume-form fieldset{margin:0;padding:0;border:0;min-width:0}
 #expert-resume-form .field{margin:16px 0 4px;font-size:15px;font-weight:600;color:#374151}
 #expert-resume-form input[type="file"]{min-height:46px;padding:6px;font-size:14px;font-weight:400}
