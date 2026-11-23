@@ -35,7 +35,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     await page.locator('[data-od="simulate"][data-kind="'+kind+'"]').click();
     if(await page.locator('#event-contact-dialog[open]').count()){
       const dialog=page.locator('#event-contact-dialog');
-      assert.match(await dialog.innerText(),/已被本赛事拉黑[\s\S]*联系赛事工作人员/);
+      await dialog.getByText('您在本赛事已禁止提交，详情联系工作人员。',{exact:true}).waitFor();
       assert.equal(await dialog.locator('img').count(),0);
       await page.locator('[data-event-contact-close]').first().click();
     }

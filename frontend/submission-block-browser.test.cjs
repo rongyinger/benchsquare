@@ -8,7 +8,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   const context=await browser.newContext(),page=await context.newPage();
   const base=process.env.DEMO_BASE||'http://127.0.0.1:4173/frontend/';
   const cid='workbench-blocked-demo',reason='你已被本赛事拉黑，无法提交或重新提交数据。';
-  const warning=reason+'详情请联系赛事工作人员。';
+  const warning='您在本赛事已禁止提交，详情联系工作人员。';
   const blockedDialog=async editor=>{
    const dialog=editor.getByRole('dialog',{name:'提交已拦截',exact:true});
    const message=dialog.getByText(warning,{exact:true});

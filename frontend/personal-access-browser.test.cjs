@@ -8,7 +8,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
   const submit=()=>page.locator('#main [data-submit-data]');
   await page.goto(base+'#competition/'+cid);await page.locator('[data-sad="toggle"]').waitFor();
   await submit().click();const dialog=page.getByRole('dialog',{name:'提交已拦截',exact:true});await dialog.waitFor();
-  assert.match(await dialog.innerText(),/详情请联系赛事工作人员/);
+  await dialog.getByText('您在本赛事已禁止提交，详情联系工作人员。',{exact:true}).waitFor();
   assert.doesNotMatch(await dialog.innerText(),/扫码|二维码|团队已被拉黑/);
   assert.equal(await dialog.locator('img').count(),0);assert.equal(await page.locator('.dd-picker,iframe').count(),0);
   await dialog.getByRole('button',{name:'我知道了',exact:true}).click();
