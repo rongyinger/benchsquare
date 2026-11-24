@@ -90,17 +90,22 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
   <div class="expert-resume-current">
    <span class="badge" data-resume-status role="status">读取中</span>
    <span class="expert-resume-filename" data-resume-filename></span>
-   <button type="button" class="text-link" data-resume-preview aria-expanded="false" aria-controls="expert-resume-preview" hidden>预览简历</button>
+   <div class="expert-resume-row-actions" hidden>
+    ${onSubmit?'<button type="button" class="text-link" data-resume-replace disabled>重新上传</button>':''}
+    <button type="button" class="text-link" data-resume-preview aria-expanded="false" aria-controls="expert-resume-preview">预览简历</button>
+   </div>
   </div>
-  <div id="expert-resume-preview" class="expert-resume-preview" hidden></div>
   <form id="expert-resume-form">
    <fieldset disabled>
-    <label class="field">简历文件
-     <input type="file" name="resume" accept=".pdf,.doc,.docx" required aria-describedby="expert-resume-formats expert-resume-error">
-    </label>
-    <p class="expert-resume-hint" id="expert-resume-formats">支持 PDF、DOC、DOCX，文件最大 10 MB。</p>
+    <div data-resume-upload-fields>
+     <label class="field">简历文件
+      <input type="file" name="resume" accept=".pdf,.doc,.docx" required aria-describedby="expert-resume-formats expert-resume-error">
+     </label>
+     <p class="expert-resume-hint" id="expert-resume-formats">支持 PDF、DOC、DOCX，文件最大 10 MB。</p>
+    </div>
     <p class="error" id="expert-resume-error" role="alert">${esc(initialError)}</p>
     <p class="expert-resume-feedback" role="status"></p>
+    <div id="expert-resume-preview" class="expert-resume-preview" hidden></div>
     <div class="expert-form-actions">
      <button class="button ${onSubmit?'':'dark'}" type="submit">上传简历</button>
      ${onSubmit?'<button class="button dark" type="button" data-resume-confirm disabled>确认提交</button>':''}
@@ -113,6 +118,8 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
  const fields=form.querySelector('fieldset'),input=form.elements.resume;
  const error=form.querySelector('.error'),feedback=form.querySelector('.expert-resume-feedback');
  const upload=form.querySelector('[type="submit"]'),confirm=form.querySelector('[data-resume-confirm]');
+ const uploadFields=form.querySelector('[data-resume-upload-fields]');
+ const rowActions=view.querySelector('.expert-resume-row-actions'),replaceButton=view.querySelector('[data-resume-replace]');
  const previewButton=view.querySelector('[data-resume-preview]'),preview=view.querySelector('#expert-resume-preview');
  const active=()=>resumeViewActive(view,user);
  let record=null,previewUrl='';
@@ -125,12 +132,22 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
   previewButton.textContent='预览简历';
  }
  function display(next){
+  const wasPreviewing=!preview.hidden;
   clearPreview();
   record=next;
+  const canReplace=Boolean(replaceButton&&record);
   showResumeStatus(view,record,'请上传参赛简历');
+  uploadFields.hidden=canReplace;
+  input.required=!canReplace;
+  upload.hidden=canReplace;
   upload.textContent=record?'保存新简历':'上传简历';
-  previewButton.hidden=!record;
+  rowActions.hidden=!record;
   if(confirm)confirm.disabled=!record;
+  if(wasPreviewing&&record)showPreview();
+ }
+ function setBusy(busy){
+  fields.disabled=busy;
+  if(replaceButton)replaceButton.disabled=busy;
  }
  const dialog=$('#dialog'),observer=new MutationObserver(()=>{
   if(active())return;
@@ -139,9 +156,7 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
  });
  observer.observe($('#dialog-content'),{childList:true});
  observer.observe(dialog,{attributes:true,attributeFilter:['open']});
- previewButton.addEventListener('click',()=>{
-  if(!record||!active())return;
-  if(!preview.hidden)return clearPreview();
+ function showPreview(){
   const {file}=record,pdf=/\.pdf$/i.test(file.name);
   previewUrl=URL.createObjectURL(pdf?new Blob([file],{type:'application/pdf'}):file);
   if(pdf){
@@ -162,44 +177,62 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
   preview.hidden=false;
   previewButton.setAttribute('aria-expanded','true');
   previewButton.textContent='收起预览';
+ }
+ previewButton.addEventListener('click',()=>{
+  if(!record||!active())return;
+  if(preview.hidden)showPreview();
+  else clearPreview();
+ });
+ replaceButton?.addEventListener('click',()=>{
+  if(!active()||fields.disabled||!record)return;
+  input.value='';
+  input.click();
  });
  $('#expert-resume-title').focus();
  view.querySelector('[data-resume-back]')?.addEventListener('click',()=>{if(active())onBack();});
  confirm?.addEventListener('click',async()=>{
   if(!active()||fields.disabled||!record)return;
-  fields.disabled=true;
+  setBusy(true);
   try{await onSubmit();}
-  finally{fields.disabled=false;}
+  finally{setBusy(false);}
  });
  input.addEventListener('change',()=>{
   error.textContent='';
   feedback.textContent='';
   input.removeAttribute('aria-invalid');
+  if(replaceButton&&record){
+   if(input.files.length)saveResume(input.files[0],true);
+   return;
+  }
   if(confirm)confirm.disabled=!record||input.files.length>0;
  });
- form.addEventListener('submit',async event=>{
+ form.addEventListener('submit',event=>{
   event.preventDefault();
+  saveResume(input.files[0],false);
+ });
+ async function saveResume(file,replacing){
   if(fields.disabled||!active())return;
-  fields.disabled=true;
+  setBusy(true);
   error.textContent='';
   input.removeAttribute('aria-invalid');
-  feedback.textContent='正在上传简历…';
+  feedback.textContent=replacing?'正在重新上传简历…':'正在上传简历…';
   try{
-   const saved=await resumes.save(user,input.files[0]);
+   const saved=await resumes.save(user,file);
    if(!active())return;
    display(saved);
    form.reset();
-   feedback.textContent='简历已上传。';
+   feedback.textContent=replacing?'简历已更新。':'简历已上传。';
   }catch(err){
    if(!active())return;
    feedback.textContent='';
    error.textContent=err?.message||'简历上传失败，请重试。';
-   input.setAttribute('aria-invalid','true');
+   if(!replacing)input.setAttribute('aria-invalid','true');
   }finally{
-   fields.disabled=false;
+   setBusy(false);
   }
-  if(confirm&&!confirm.disabled&&!error.textContent)confirm.focus();
- });
+  if(replacing)replaceButton.focus();
+  else if(confirm&&!confirm.disabled&&!error.textContent)confirm.focus();
+ }
  try{
   const record=await resumes.get(user);
   if(active())display(record);
@@ -209,7 +242,7 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
    error.textContent='暂时无法读取简历，请重试或重新上传。';
   }
  }finally{
-  fields.disabled=false;
+  setBusy(false);
  }
 }
 

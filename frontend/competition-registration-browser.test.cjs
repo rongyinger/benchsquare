@@ -5,6 +5,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
 const base=process.env.DEMO_BASE||'http://127.0.0.1:4173/frontend/';
 const first='identity-verification-demo',second='resume-reuse-test';
 const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4\nTest resume')};
+const replacement={...resume,name:'重新上传的简历.pdf',buffer:Buffer.from('%PDF-1.4\nReplacement resume')};
 
 (async()=>{
  const browser=await chromium.launch({channel:process.env.BENCHSQUARE_BROWSER||'chrome',headless:true});
@@ -18,6 +19,7 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   const button=(scope,name)=>scope.getByRole('button',{name,exact:true});
   const next=button(signup,'下一步');
   const confirm=button(upload,'确认提交');
+  const replace=button(dialog,'重新上传');
   const rules=signup.getByRole('checkbox');
   const start=()=>button(page.locator('.detail-heading'),'报名参加比赛').click();
   const closeDialog=()=>button(dialog,'关闭').click();
@@ -39,6 +41,10 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
    await upload.getByLabel('简历文件').setInputFiles(file);
    await upload.locator('[type="submit"]').click();
   };
+  const replaceResume=async file=>{
+   const [chooser]=await Promise.all([page.waitForEvent('filechooser'),replace.click()]);
+   await chooser.setFiles(file);
+  };
   const continueToTeam=async()=>{
    const group=page.locator('#event-contact-dialog[open]');
    if(await page.evaluate(()=>Boolean(window.EventContact))){
@@ -57,6 +63,7 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   await next.click();
   await upload.waitFor();
   assert.equal(await confirm.isEnabled(),false);
+  assert.equal(await replace.count(),0);
   assert.equal(await identity.count(),0);
   await button(dialog,'返回报名规则').click();
   assert.equal(await rules.isChecked(),true);
@@ -68,14 +75,30 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   await uploadResume(resume);
   await dialog.getByText(resume.name,{exact:true}).waitFor();
   await button(dialog,'预览简历').click();
-  await dialog.getByTitle('简历 PDF 预览').waitFor();
+  const preview=dialog.getByTitle('简历 PDF 预览');
+  await preview.waitFor();
+  const originalPreview=await preview.getAttribute('src');
+  await replaceResume([]);
+  assert.equal(await preview.getAttribute('src'),originalPreview);
+  assert.equal(await confirm.isEnabled(),true);
+  await replaceResume({name:'简历.txt',mimeType:'text/plain',buffer:Buffer.from('unsupported')});
+  await upload.getByRole('alert').getByText('请上传 PDF、DOC 或 DOCX 格式的简历。').waitFor();
+  assert.equal(await preview.getAttribute('src'),originalPreview);
+  assert.equal(await page.evaluate(async()=>(await ResumeFiles.get('rong')).file.name),resume.name);
+  assert.equal(await confirm.isEnabled(),true);
+  await replaceResume(replacement);
+  await upload.getByRole('status').getByText('简历已更新。').waitFor();
+  await dialog.getByText(replacement.name,{exact:true}).waitFor();
+  assert.notEqual(await preview.getAttribute('src'),originalPreview);
+  assert.equal(await dialog.getByRole('link',{name:'下载简历'}).getAttribute('download'),replacement.name);
+  assert.equal(await page.evaluate(async()=>(await ResumeFiles.get('rong')).file.text()),replacement.buffer.toString());
   assert.equal((await read()).regs[first].rong,undefined,'uploading alone must not register the user');
   await confirm.click();
   await identity.waitFor();
   assert.equal((await read()).accounts.rong?.realNameVerifiedAt,undefined);
   assert.equal((await read()).regs[first].rong,undefined);
   await button(dialog,'返回我的简历').click();
-  await dialog.getByText(resume.name,{exact:true}).waitFor();
+  await dialog.getByText(replacement.name,{exact:true}).waitFor();
   await confirm.click();
   await identity.waitFor();
   // The form reads the current attachment again when verification resumes submission.
@@ -93,7 +116,7 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   await page.locator('[data-event-community] .ec-community-qr img').waitFor();
 
   await profile();
-  await dialog.getByText(resume.name,{exact:true}).waitFor();
+  await dialog.getByText(replacement.name,{exact:true}).waitFor();
   await button(dialog,'更换简历').click();
   const updated={...resume,name:'更新版简历.pdf'};
   await uploadResume(updated);
@@ -115,6 +138,7 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   await rules.check();
   await next.click();
   await dialog.getByText(updated.name,{exact:true}).waitFor();
+  assert.equal(await replace.isVisible(),true);
   await confirm.click();
   await continueToTeam();
 
@@ -131,6 +155,10 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   assert.equal(await confirm.isEnabled(),false);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await uploadResume(resume);
+  await replace.waitFor();
+  await replaceResume(replacement);
+  await dialog.getByText(replacement.name,{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await confirm.click();
   await identity.waitFor();
   await closeDialog();
@@ -142,7 +170,7 @@ const resume={name:'参赛简历.pdf',mimeType:'application/pdf',buffer:Buffer.f
   assert.equal(await confirm.count(),0);
   assert.equal((await read()).regs[first].xu,undefined);
   assert.deepEqual(errors,[]);
-  console.log('Competition registration passed: identity and resume gates, validation, confirmation, persistence, reuse, account isolation and mobile.');
+  console.log('Competition registration passed: resume re-upload, cancellation, invalid replacement, preview refresh, confirmation, persistence, account isolation and mobile.');
  }finally{
   await browser.close();
  }

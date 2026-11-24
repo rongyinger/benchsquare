@@ -45,7 +45,14 @@
 }
 .expert-resume-current .badge{flex-shrink:0;font-size:13px}
 .expert-resume-filename{overflow-wrap:anywhere}
-.expert-resume-current [data-resume-preview]{flex-shrink:0;margin-left:auto}
+.expert-resume-current .expert-resume-filename{flex:1;min-width:0}
+.expert-resume-row-actions{display:flex;gap:12px;flex-shrink:0;margin-left:auto}
+.expert-resume-row-actions[hidden]{display:none}
+.expert-resume-row-actions button{min-height:36px;white-space:nowrap}
+@media(max-width:520px){
+  .expert-resume-current{flex-wrap:wrap}
+  .expert-resume-row-actions{flex-basis:100%;justify-content:flex-end}
+}
 .expert-resume-preview{margin-top:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
 .expert-resume-preview iframe{display:block;width:100%;height:min(45dvh,400px);border:0;background:#fff}
 .expert-resume-preview a{display:inline-block;margin-top:8px;text-decoration:underline}
