@@ -20,8 +20,8 @@ const exampleName='演示用户',exampleNumber='000000200001010010',examplePhone
     const title=name=>page.getByRole('heading',{name,exact:true});
     const dialog=page.locator('#dialog');
     const signup=page.getByRole('dialog',{name:'报名参加比赛',exact:true});
-    const resume=page.getByRole('dialog',{name:'我的简历',exact:true});
-    const next=button('下一步'),confirm=button('确认提交');
+    const resume=page.getByRole('dialog',{name:'确认简历',exact:true});
+    const next=button('下一步'),confirm=button('确认报名');
     const form=page.locator('#expert-identity-form');
     const name=form.getByRole('textbox',{name:'姓名',exact:true});
     const number=form.getByRole('textbox',{name:'身份证号码',exact:true});
@@ -117,9 +117,9 @@ const exampleName='演示用户',exampleNumber='000000200001010010',examplePhone
     assert.match(await dialog.innerText(),/完成实名认证后，将继续提交本次报名/);
     assert.equal(await dialog.evaluate(el=>el.matches(':modal')),true);
     assert.equal(await form.getByRole('textbox').count(),4);
-    await button('返回我的简历').click();
+    await button('返回确认简历').click();
     await resume.getByText('演示简历.pdf',{exact:true}).waitFor();
-    await button('返回报名规则').click();
+    await resume.getByRole('button',{name:'取消',exact:true}).click();
     await signup.waitFor();
     assert.equal(await signup.getByRole('checkbox').isChecked(),true);
     await next.click();
@@ -214,7 +214,7 @@ const exampleName='演示用户',exampleNumber='000000200001010010',examplePhone
     await form.waitFor();
     assert.equal(page.url(),route('competition/'+cid));
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-    const back=await button('返回我的简历').boundingBox();
+    const back=await button('返回确认简历').boundingBox();
     const modal=await dialog.boundingBox();
     assert.ok(back.x<modal.x+modal.width/2&&back.y<modal.y+modal.height/3,'Back belongs at the upper left');
     await dialog.getByRole('button',{name:'关闭',exact:true}).click();

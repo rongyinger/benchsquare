@@ -126,7 +126,7 @@ const {chromium}=require(process.env.BENCHSQUARE_PLAYWRIGHT||'playwright');
     assert.equal((await read('od-chart')).participantRegistration,undefined);
     await resumeForm.locator('[name="resume"]').setInputFiles({name:'resume.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\n%%EOF')});
     await resumeForm.locator('button[type="submit"]').click();
-    await resumeForm.getByRole('button',{name:'确认提交'}).click();
+    await resumeForm.getByRole('button',{name:'确认报名'}).click();
     await identityForm.locator('[name="realName"]').fill('演示用户');
     await identityForm.locator('[name="idNumber"]').fill('000000200001010010');
     await identityForm.getByLabel('手机号',{exact:true}).fill('13800000000');

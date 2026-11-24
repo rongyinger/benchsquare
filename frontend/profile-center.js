@@ -83,16 +83,16 @@ function showResumeStatus(view,record,emptyMessage){
 async function openResume({onSubmit,onBack,initialError=''}={}){
  if(sessionStorage.getItem('expert-demo-out')==='yes')return openProfile({resumeAfterLogin:true});
  const user=api.uid();
- show(`<div class="expert-resume" data-expert-profile-actor="${esc(user)}">
-  <button type="button" class="text-link expert-verification-back" ${onBack?'data-resume-back':'data-expert="profile-page"'}><span aria-hidden="true">←</span> ${onBack?'返回报名规则':'返回个人资料'}</button>
-  <h2 id="expert-resume-title" tabindex="-1">${onSubmit?'我的简历':'上传简历'}</h2>
-  <p>${onSubmit?'请确认用于本次报名的简历。已有简历会自动带出。':'上传后的简历可用于后续比赛报名。'}</p>
+ show(`<div class="expert-resume${onSubmit?' expert-resume-registration':''}" data-expert-profile-actor="${esc(user)}">
+  ${onSubmit?'':'<button type="button" class="text-link expert-verification-back" data-expert="profile-page"><span aria-hidden="true">←</span> 返回个人资料</button>'}
+  <h2 id="expert-resume-title" tabindex="-1">${onSubmit?'确认简历':'上传简历'}</h2>
+  ${onSubmit?'':'<p>上传后的简历可用于后续比赛报名。</p>'}
   <div class="expert-resume-current">
    <span class="badge" data-resume-status role="status">读取中</span>
+   ${onSubmit?'<svg class="expert-resume-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6m-6 4h6"/></svg>':''}
    <span class="expert-resume-filename" data-resume-filename></span>
    <div class="expert-resume-row-actions" hidden>
-    ${onSubmit?'<button type="button" class="text-link" data-resume-replace disabled>重新上传</button>':''}
-    <button type="button" class="text-link" data-resume-preview aria-expanded="false" aria-controls="expert-resume-preview">预览简历</button>
+    ${onSubmit?'<button type="button" class="text-link" data-resume-replace disabled>重新上传</button><button type="button" class="text-link" data-resume-fullscreen aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/></svg>全屏预览</button>':'<button type="button" class="text-link" data-resume-preview aria-expanded="false" aria-controls="expert-resume-preview">预览简历</button>'}
    </div>
   </div>
   <form id="expert-resume-form">
@@ -108,11 +108,11 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
     <div id="expert-resume-preview" class="expert-resume-preview" hidden></div>
     <div class="expert-form-actions">
      <button class="button ${onSubmit?'':'dark'}" type="submit">上传简历</button>
-     ${onSubmit?'<button class="button dark" type="button" data-resume-confirm disabled>确认提交</button>':''}
+     ${onSubmit?'<button class="button" type="button" data-resume-back>取消</button><button class="button dark" type="button" data-resume-confirm disabled>确认报名</button>':''}
     </div>
    </fieldset>
   </form>
-  <p class="expert-card-note">当前演示将简历保存在此浏览器中。</p>
+  ${onSubmit?'<dialog class="expert-resume-fullscreen" aria-labelledby="expert-resume-fullscreen-title"><header><h3 id="expert-resume-fullscreen-title">全屏预览</h3><button type="button" class="button" data-resume-exit-fullscreen>退出全屏</button></header><iframe title="全屏简历 PDF 预览"></iframe></dialog>':'<p class="expert-card-note">当前演示将简历保存在此浏览器中。</p>'}
  </div>`);
  const form=$('#expert-resume-form'),view=form.closest('.expert-resume');
  const fields=form.querySelector('fieldset'),input=form.elements.resume;
@@ -121,6 +121,8 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
  const uploadFields=form.querySelector('[data-resume-upload-fields]');
  const rowActions=view.querySelector('.expert-resume-row-actions'),replaceButton=view.querySelector('[data-resume-replace]');
  const previewButton=view.querySelector('[data-resume-preview]'),preview=view.querySelector('#expert-resume-preview');
+ const fullscreenButton=view.querySelector('[data-resume-fullscreen]'),fullscreen=view.querySelector('.expert-resume-fullscreen');
+ const fullscreenFrame=fullscreen?.querySelector('iframe');
  const active=()=>resumeViewActive(view,user);
  let record=null,previewUrl='';
  function clearPreview(){
@@ -128,8 +130,10 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
   previewUrl='';
   preview.replaceChildren();
   preview.hidden=true;
-  previewButton.setAttribute('aria-expanded','false');
-  previewButton.textContent='预览简历';
+  if(previewButton){
+   previewButton.setAttribute('aria-expanded','false');
+   previewButton.textContent='预览简历';
+  }
  }
  function display(next){
   const wasPreviewing=!preview.hidden;
@@ -142,8 +146,9 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
   upload.hidden=canReplace;
   upload.textContent=record?'保存新简历':'上传简历';
   rowActions.hidden=!record;
+  if(fullscreenButton)fullscreenButton.hidden=!record||!/\.pdf$/i.test(record.file.name);
   if(confirm)confirm.disabled=!record;
-  if(wasPreviewing&&record)showPreview();
+  if(record&&(onSubmit||wasPreviewing))showPreview();
  }
  function setBusy(busy){
   fields.disabled=busy;
@@ -151,6 +156,7 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
  }
  const dialog=$('#dialog'),observer=new MutationObserver(()=>{
   if(active())return;
+  if(fullscreen?.open)fullscreen.close();
   clearPreview();
   observer.disconnect();
  });
@@ -162,7 +168,7 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
   if(pdf){
    const frame=document.createElement('iframe');
    frame.title='简历 PDF 预览';
-   frame.src=previewUrl;
+   frame.src=onSubmit?`${previewUrl}#navpanes=0`:previewUrl;
    preview.append(frame);
   }else{
    const note=document.createElement('p');
@@ -173,15 +179,28 @@ async function openResume({onSubmit,onBack,initialError=''}={}){
   download.href=previewUrl;
   download.download=file.name;
   download.textContent='下载简历';
+  if(onSubmit&&pdf)download.className='expert-resume-pdf-download';
   preview.append(download);
   preview.hidden=false;
-  previewButton.setAttribute('aria-expanded','true');
-  previewButton.textContent='收起预览';
+  if(previewButton){
+   previewButton.setAttribute('aria-expanded','true');
+   previewButton.textContent='收起预览';
+  }
  }
- previewButton.addEventListener('click',()=>{
+ previewButton?.addEventListener('click',()=>{
   if(!record||!active())return;
   if(preview.hidden)showPreview();
   else clearPreview();
+ });
+ fullscreenButton?.addEventListener('click',()=>{
+  if(!active()||fields.disabled||!previewUrl)return;
+  fullscreenFrame.src=preview.querySelector('iframe').src;
+  fullscreen.showModal();
+ });
+ fullscreen?.querySelector('[data-resume-exit-fullscreen]').addEventListener('click',()=>fullscreen.close());
+ fullscreen?.addEventListener('close',()=>{
+  fullscreenFrame.removeAttribute('src');
+  if(active())fullscreenButton.focus();
  });
  replaceButton?.addEventListener('click',()=>{
   if(!active()||fields.disabled||!record)return;
@@ -254,7 +273,7 @@ function openVerification(competitionId='',registration){
   return openProfile({competitionId});
  }
  show(`<div class="expert-verification" data-expert-profile-actor="${esc(user)}">
-  <button type="button" class="text-link expert-verification-back" data-expert="profile-back" data-competition="${esc(competitionId)}"><span aria-hidden="true">←</span> 返回${registration?'我的简历':''}</button>
+  <button type="button" class="text-link expert-verification-back" data-expert="profile-back" data-competition="${esc(competitionId)}"><span aria-hidden="true">←</span> 返回${registration?'确认简历':''}</button>
   <h2 id="expert-verification-title" tabindex="-1">实名认证</h2>
   ${registration?'<p>完成实名认证后，将继续提交本次报名。</p>':competitionId?'<p>请先完成实名认证，再报名赛事。</p>':''}
   <form id="expert-identity-form" data-actor="${esc(user)}" data-competition="${esc(competitionId)}">

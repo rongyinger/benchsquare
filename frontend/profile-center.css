@@ -76,3 +76,58 @@
 #expert-resume-form .button{min-height:44px;font-size:15px}
 .expert-resume p.expert-resume-hint,.expert-resume p.expert-card-note{margin:6px 0 0;font-size:13px;line-height:1.6}
 .expert-resume p.expert-card-note{margin-top:14px}
+
+#dialog:has(.expert-resume-registration){
+  width:min(1180px,calc(100vw - 48px));
+  max-width:none;
+  max-height:calc(100dvh - 48px);
+  padding:22px;
+  border-radius:12px;
+}
+#dialog:has(.expert-resume-registration)::backdrop{background:rgb(0 0 0/.5);backdrop-filter:none}
+.expert-resume-registration > h2{margin:0 0 32px;font-size:24px;font-weight:500}
+.expert-resume-registration .expert-resume-current{min-height:64px;padding:12px 18px}
+.expert-resume-file-icon{display:none;width:23px;height:23px;flex:none;color:#374151}
+.expert-resume-registration .expert-resume-current:has(.badge.green) .expert-resume-file-icon{display:block}
+.expert-resume-registration .badge.green{display:none}
+.expert-resume-registration .expert-resume-filename{color:#374151;font-size:16px}
+.expert-resume-registration .expert-resume-row-actions{gap:18px}
+.expert-resume-registration .expert-resume-row-actions button{display:inline-flex;align-items:center;gap:6px;color:#765605;font-size:14px;font-weight:600}
+.expert-resume-registration .expert-resume-row-actions button[hidden]{display:none}
+.expert-resume-row-actions [data-resume-fullscreen] svg{width:18px;height:18px}
+.expert-resume-registration .expert-resume-preview{padding:0;overflow:hidden;background:#fff;border-radius:10px;margin-top:18px}
+.expert-resume-registration .expert-resume-preview iframe{height:min(61dvh,760px)}
+.expert-resume-registration .expert-resume-preview p,.expert-resume-registration .expert-resume-preview a{margin:12px 14px}
+.expert-resume-registration .expert-resume-preview a.expert-resume-pdf-download{display:none}
+.expert-resume-registration #expert-resume-form .expert-form-actions{justify-content:flex-end;margin-top:28px}
+.expert-resume-registration #expert-resume-form .button{border-radius:9px;font-weight:600}
+.expert-resume-registration [data-resume-confirm].button.dark{background:#ffd422;border-color:#ffd422;color:#2b2100}
+.expert-resume-registration [data-resume-confirm].button.dark:hover{background:#ffca0a;border-color:#ffca0a}
+.expert-resume-registration [data-resume-confirm].button.dark:disabled{opacity:.5}
+.expert-resume-fullscreen[open]{
+  display:flex;
+  flex-direction:column;
+  position:fixed;
+  inset:0;
+  width:100vw;
+  height:100dvh;
+  max-width:none;
+  max-height:none;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:#262626;
+  overflow:hidden;
+}
+.expert-resume-fullscreen header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;background:#fff}
+.expert-resume-fullscreen h3{margin:0;font-size:16px}
+.expert-resume-fullscreen iframe{flex:1;width:100%;min-height:0;border:0}
+@media(max-width:600px){
+  #dialog:has(.expert-resume-registration){width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:16px}
+  .expert-resume-registration > h2{margin-bottom:20px;font-size:22px}
+  .expert-resume-registration .expert-resume-current{padding:10px 12px}
+  .expert-resume-registration .expert-resume-preview iframe{height:48dvh}
+  .expert-resume-registration .expert-resume-preview a.expert-resume-pdf-download{display:inline-block}
+  .expert-resume-registration #expert-resume-form .expert-form-actions{margin-top:18px}
+}
