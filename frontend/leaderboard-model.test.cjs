@@ -22,3 +22,13 @@ console.log('Leaderboard passed: eligibility, precision, stable ties, immutable 
 
 assert.deepEqual(M.rank([{id:'one',score:9300,valid:1,achievedAt:1},{id:'two',score:9400,valid:2,achievedAt:1},{id:'zero',score:9900,valid:0},{id:'pending',score:null,valid:1}]).map(t=>t.id),['two','one']);
 assert.equal(M.fixtures('test')[0].valid,1);assert.equal(M.fixtures('test')[1].valid,2);
+const results=[
+ {id:'one',competitionId:'event',teamId:'team',revision:1,status:'已录用',submittedAt:'2026-11-01',reviews:[{revision:1,to:'已录用',score:80,at:'2026-11-02'}]},
+ {id:'two',competitionId:'event',teamId:'team',revision:2,status:'已通过',submittedAt:'2026-11-03',reviews:[{revision:2,to:'已通过',score:90,at:'2026-11-04'}]},
+ {id:'three',competitionId:'event',teamId:'team',revision:1,status:'未通过',reviews:[{revision:1,to:'未通过',score:99,at:'2026-11-04'}]},
+ {id:'four',competitionId:'other',teamId:'team',revision:1,status:'已录用',reviews:[{revision:1,to:'已录用',score:99,at:'2026-11-04'}]}
+];
+const [team]=M.aggregate([{id:'team',name:'测试团队'}],results,'event');
+assert.equal(team.score,17000);
+assert.equal(team.valid,2);
+assert.equal(M.aggregate([{id:'team'}],results.map(r=>({...r,status:'未通过'})),'event')[0].valid,0);

@@ -22,7 +22,21 @@
   if(migrated)persist();
   const date=n=>new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(n);
   function own(c){const t=team(c);return t?{...t,members:t.members.map(id=>window.expertCenter.names(id))}:null;}
-  function data(c){const v=view(c),t=own(c);const rows=isDemo(c)?M.fixtures(c.id,t):[];return M.select(rows,{...v,teamId:t?.id});}
+  function data(c){
+    const v=view(c),t=own(c),fixtures=isDemo(c)?M.fixtures(c.id,t):[];
+    const teams=window.expertCenter.db.teams.filter(team=>team.cid===c.id).map(team=>({...team,members:team.members.map(id=>window.expertCenter.names(id))}));
+    const allTeams=[...fixtures,...teams.filter(team=>!fixtures.some(row=>row.id===team.id))];
+    let records=[];
+    try{records=DataItems.read().records.filter(record=>!record.mock);}catch{v.readError=true;}
+    const demo=JSON.parse(localStorage.getItem('benchsquare-leaderboard-pe-demo')||'{}')[c.id];
+    if(demo)records.push(demo);
+    const aggregated=M.aggregate(allTeams,records,c.id);
+    const rows=aggregated.map(row=>{
+      const base=fixtures.find(item=>item.id===row.id);
+      return base?{...row,score:base.score+row.score,valid:base.valid+row.valid,achievedAt:row.valid?row.achievedAt:base.achievedAt,lastAt:Math.max(base.lastAt,row.lastAt)}:row;
+    });
+    return M.select(rows,{...v,teamId:t?.id});
+  }
   function result(c){
     const v=view(c),t=own(c),d=data(c);
     let hint='';
@@ -35,13 +49,17 @@
   }
   function content(c){
     const v=view(c),t=own(c);if(!v.updatedAt)v.updatedAt=Date.now();
-    return `<section class="leaderboard" aria-labelledby="lb-title"><header class="lb-heading"><div><div class="lb-kicker">COMPETITION LEADERBOARD</div><h2 id="lb-title">公开排行榜 ${isDemo(c)?'<span class="lb-demo-badge">演示数据</span>':''}</h2><p>查看团队整体成绩与有效提交进度。</p></div><button class="button lb-refresh" data-lb="refresh" aria-label="更新排行榜"><span aria-hidden="true">↻</span> 更新</button></header><div class="lb-controls"><label class="lb-search">${icon('search')}<input type="search" id="lb-search" placeholder="搜索团队名称" aria-label="搜索排行榜团队" value="${esc(v.query)}"></label><label class="lb-only-mine"><input type="checkbox" id="lb-only-mine" ${v.mine?'checked':''} ${t?'':'disabled'}>仅看我的团队</label></div><p class="lb-rule">至少 1 道任务验收通过且完成评分即可上榜。按最高至多 3 道有效任务的平均分排名，不足 3 道按实际数量计算，分数越高越好。同分并列，按达到该分数的时间展示。</p><div id="lb-results" aria-live="polite">${result(c)}</div><p class="lb-footnote">公开榜单仅展示团队整体成绩，个人提交进度仅在本队“团队”页查看。公开榜单供参赛进度参考，最终获奖名单以赛事公示为准。${!t?'报名并完成组队后，可查看我的团队成绩。':''}</p></section>`;
+    return `<section class="leaderboard" aria-labelledby="lb-title"><header class="lb-heading"><div><div class="lb-kicker">COMPETITION LEADERBOARD</div><h2 id="lb-title">公开排行榜 ${isDemo(c)?'<span class="lb-demo-badge">演示数据</span>':''}</h2><p>PE 回传录用结果与评分后，榜单自动更新。</p></div><button class="button lb-refresh" data-lb="refresh" aria-label="更新排行榜"><span aria-hidden="true">↻</span> 更新</button></header>${isDemo(c)?'<div class="notice">演示 PE 结果回传：为首支示例团队模拟一条任务结果。 <button class="button" data-lb="accept">录用 · 80 分</button> <button class="button" data-lb="reject">未录用</button></div>':''}<div class="lb-controls"><label class="lb-search">${icon('search')}<input type="search" id="lb-search" placeholder="搜索团队名称" aria-label="搜索排行榜团队" value="${esc(v.query)}"></label><label class="lb-only-mine"><input type="checkbox" id="lb-only-mine" ${v.mine?'checked':''}  ${t?'':'disabled'}>仅看我的团队</label></div><p class="lb-rule">录用且已评分的任务计入榜单。团队综合得分为所有有效任务得分之和，按两位小数降序排名，同分并列。</p><div id="lb-results" aria-live="polite">${result(c)}</div><p class="lb-footnote">公开榜单仅展示团队整体成绩，个人提交进度仅在本队“团队”页查看。公开榜单供参赛进度参考，最终获奖名单以赛事公示为准。${!t?'报名并完成组队后，可查看我的团队成绩。':''}</p></section>`;
   }
   detailContent=function(c){return detailTab==='排行榜'?content(c):oldContent(c);};
   details=function(c){const html=oldDetails(c);return detailTab==='排行榜'?html.replace('class="detail-grid"','class="detail-grid lb-full-width"'):html;};
   function update(){const c=find(currentId);if(c&&detailTab==='排行榜'&&$('#lb-results'))$('#lb-results').innerHTML=result(c);}
   document.addEventListener('input',e=>{if(e.target.id!=='lb-search')return;const c=find(currentId);if(!c)return;Object.assign(view(c),{query:e.target.value,expanded:false});update();});
   document.addEventListener('change',e=>{const c=find(currentId);if(!c)return;const v=view(c);if(e.target.id==='lb-only-mine'){v.mine=e.target.checked;v.expanded=false;update();}});
-  document.addEventListener('click',e=>{const b=e.target.closest('[data-lb]');if(!b)return;const c=find(currentId);if(!c)return;const v=view(c);switch(b.dataset.lb){case 'refresh':v.updatedAt=Date.now();update();toast(isDemo(c)?'演示榜单已更新，模拟成绩保持不变。':'排行榜已更新。');break;case 'clear':Object.assign(v,{query:'',mine:false,expanded:false});$('#lb-search').value='';$('#lb-only-mine').checked=false;update();$('#lb-search').focus();break;case 'toggle':v.expanded=!v.expanded;update();$('#lb-results [data-lb="toggle"]')?.focus({preventScroll:true});break;}});
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-lb]');if(!b)return;const c=find(currentId);if(!c)return;const v=view(c);switch(b.dataset.lb){case 'accept':case 'reject':{
+    const team=M.fixtures(c.id,own(c))[0],now=new Date().toISOString(),accepted=b.dataset.lb==='accept';
+    try{const stored=JSON.parse(localStorage.getItem('benchsquare-leaderboard-pe-demo')||'{}');stored[c.id]={id:'pe-demo-result',competitionId:c.id,teamId:team.id,revision:1,status:accepted?'已录用':'未通过',submittedAt:now,reviews:[{revision:1,to:accepted?'已录用':'未通过',score:80,at:now}]};localStorage.setItem('benchsquare-leaderboard-pe-demo',JSON.stringify(stored));v.updatedAt=Date.now();update();toast(accepted?'已模拟录用及评分回传，榜单已更新。':'已模拟未录用回传，榜单已更新。');}catch{toast('演示结果保存失败，请重试。');}break;}
+    case 'refresh':v.updatedAt=Date.now();update();toast('排行榜已更新。');break;case 'clear':Object.assign(v,{query:'',mine:false,expanded:false});$('#lb-search').value='';$('#lb-only-mine').checked=false;update();$('#lb-search').focus();break;case 'toggle':v.expanded=!v.expanded;update();$('#lb-results [data-lb="toggle"]')?.focus({preventScroll:true});break;}});
+  window.addEventListener('storage',e=>{if([DataItems.key,'ale-frontend-v1','benchsquare-leaderboard-pe-demo'].includes(e.key)){const c=find(currentId);if(c&&detailTab==='排行榜'){view(c).updatedAt=Date.now();update();}}});
   render();
 })();

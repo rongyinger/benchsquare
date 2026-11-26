@@ -20,7 +20,16 @@
     if(ownTeam)teams[5]={...teams[5],id:ownTeam.id,name:ownTeam.name,members:ownTeam.members};
     return teams;
   }
-  const api={rank,select,fixtures};
+  function aggregate(teams,records,cid){
+    return teams.map(team=>{
+      const accepted=records.filter(r=>r.competitionId===cid&&r.teamId===team.id&&r.revision>0&&['已通过','已录用'].includes(r.status)).map(r=>{
+        const review=(r.reviews||[]).filter(item=>item.revision===r.revision&&['已通过','已录用'].includes(item.to)).at(-1);
+        return {score:review?.score,at:Date.parse(review?.at),submitted:Date.parse(r.submittedAt||r.history?.find(h=>h.revision===r.revision)?.at)};
+      }).filter(r=>Number.isFinite(r.score)&&r.score>=0&&Number.isFinite(r.at));
+      return {...team,score:accepted.reduce((sum,r)=>sum+Math.round(r.score*100),0),valid:accepted.length,achievedAt:Math.max(0,...accepted.map(r=>r.at)),lastAt:Math.max(0,...accepted.map(r=>Number.isFinite(r.submitted)?r.submitted:r.at))};
+    });
+  }
+  const api={rank,select,fixtures,aggregate};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   else root.LeaderboardModel=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
